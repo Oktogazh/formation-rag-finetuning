@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import re
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent
@@ -182,11 +183,17 @@ def _paire(chemin: str) -> tuple[Path, Path]:
 
 def cmd_indice(args) -> int:
     import difflib
-    import re
 
     exercice, corrige = _paire(args.fichier)
     texte_exercice = exercice.read_text(encoding="utf-8").splitlines(keepends=True)
-    texte_corrige = corrige.read_text(encoding="utf-8").splitlines(keepends=True)
+    # Les lignes « #! » sont la consigne telle qu'elle est stockee dans le
+    # corrige ; dans votre fichier elles sont deja des commentaires ordinaires.
+    # On les normalise, sinon le diff serait plein de marqueurs qui ne vous
+    # apprennent rien.
+    texte_corrige = [
+        re.sub(r"^(\s*)#!\s?", r"\1# ", ligne)
+        for ligne in corrige.read_text(encoding="utf-8").splitlines(keepends=True)
+    ]
 
     if args.todo:
         def extraire(lignes):
