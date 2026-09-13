@@ -76,8 +76,38 @@ incident de production, pas une audace.
 python tp.py chaine --verifier --n 20
 ```
 
-Comparez les deux tables : les anomalies restantes baissent, les appels montent.
-**Notez le facteur de coût réel** — c'est le chiffre à connaître au TP 6.
+Comparez les deux tables. Et préparez-vous à un résultat désagréable : voir
+ci-dessous.
+
+## Ce que ça donne — mesuré le 13 septembre 2026
+
+`ministral-3:3b` sous Ollama, recherche dense `k=3`, les 80 segments.
+
+| | BLEU | chrF | Termino | Chiffres | Appels | Anomalies |
+|---|---|---|---|---|---|---|
+| chaîne seule | **70,5** | 84,7 | 100 % | 96 % | 1,00 | 3 détectées |
+| chaîne + vérification | 66,8 | 83,8 | 100 % | **98 %** | 1,04 | 2 restantes |
+
+**La boucle de correction améliore les chiffres et fait perdre 4 points de
+BLEU.** Ce n'est pas une erreur de votre part, et il ne faut pas la cacher :
+c'est le résultat.
+
+Pourquoi ? On demande au modèle de corriger un détail, et il réécrit toute la
+phrase. Elle reste juste, mais elle s'éloigne de la référence, et BLEU compte
+des n-grammes. Trois conclusions, et ce sont des conclusions d'ingénieur :
+
+1. **une correction par modèle de langue n'est pas une opération ciblée.** Si
+   vous voulez changer un nombre, changez le nombre ;
+2. **le bonus 3 est la vraie réponse** : `reparer_sans_modele` corrige les
+   chiffres par un remplacement de texte, sans appel, sans dérive ;
+3. et si votre indicateur de production est la conformité plutôt que BLEU, alors
+   la boucle est un gain net. **Le choix de l'indicateur est une décision
+   métier**, pas une décision technique.
+
+Trois anomalies détectées sur 80 segments, c'est peu — parce que la recherche
+dense du TP 2 fait déjà bien son travail. **Une vérification qui ne trouve rien
+n'est pas inutile** : c'est une garantie, et son prix est de 4 % d'appels en
+plus.
 
 **4. Regarder la chaîne tourner.**
 

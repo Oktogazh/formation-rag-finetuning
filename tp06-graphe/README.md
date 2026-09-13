@@ -27,12 +27,13 @@ réutilise pas : c'est la faute la plus chère qu'un outil de TAO puisse produir
 
 Sur le corpus Helios, mesuré le 13 septembre 2026 : **41 segments sur 80**
 remplissent la condition, et la réparation floue rend la référence **exacte 41
-fois sur 41**. Dont les 20 `piege` — ceux-là mêmes que le chemin RAG rate
-régulièrement, parce que le modèle, voyant un voisin qui dit « 14 jours » et une
-source qui dit « 180 jours », recopie parfois 14.
+fois sur 41**, sans un seul appel au modèle.
 
 La leçon est inconfortable et c'est la meilleure de la formation : **pour la
 moitié du corpus, la bonne réponse n'est pas d'appeler un modèle de langue.**
+Non pas parce que le modèle échouerait — sur ces segments-là il s'en sort bien —
+mais parce qu'il coûte du temps, de l'argent et de l'incertitude pour produire
+ce qu'un remplacement de texte donne exactement et instantanément.
 
 ## Prérequis
 
@@ -90,6 +91,43 @@ Comment la lire, dans cet ordre :
    le résultat le plus utile de ces trois jours.
 3. **La ligne `nouveau` des tableaux par catégorie.** Elle rappelle ce
    qu'aucune technique ne sait faire : inventer ce qui n'est nulle part.
+
+## Ce que ça donne — mesuré le 13 septembre 2026
+
+`ministral-3:3b` sous Ollama, recherche dense `k=3`, les **80** segments, moteur
+de base (sans adaptateur).
+
+| | BLEU | chrF | Termino | Chiffres | s/seg | Appels |
+|---|---|---|---|---|---|---|
+| TP 3, chaîne seule | 70,5 | 84,7 | 100 % | 96 % | 1,14 | 1,00 |
+| TP 3, + vérification | 66,8 | 83,8 | 100 % | 98 % | 1,74 | 1,04 |
+| **TP 6, graphe routé** | **75,1** | **86,1** | 100 % | 98 % | **1,01** | **0,51** |
+
+Comparez uniquement des lignes mesurées sur le **même nombre de segments** :
+ces trois-là le sont, sur les 80.
+
+Le graphe fait mieux que la chaîne **et coûte moitié moins d'appels**. Par
+catégorie :
+
+| Catégorie | BLEU | Appels | Chemin |
+|---|---|---|---|
+| `repetition` (21) | **100,0** | **0,00** | réutiliser |
+| `piege` (20) | **100,0** | **0,00** | réutiliser |
+| `fuzzy` (18) | 47,9 | 1,00 | RAG |
+| `nouveau` (21) | 51,0 | 1,10 | RAG, parfois corrigé |
+
+Répartition : 41 segments réutilisés, 37 en RAG, 2 en RAG + correction.
+
+Deux choses à dire à voix haute devant ce tableau :
+
+1. **Le gain vient du routage, pas d'une meilleure traduction.** Sur `fuzzy` et
+   `nouveau`, le graphe fait exactement ce que faisait le TP 3, aux mêmes
+   chiffres. Tout le progrès est d'avoir cessé d'appeler le modèle là où il
+   n'apportait rien.
+2. **Le plafond, ce sont les lignes `fuzzy` et `nouveau`**, à 48 et 51. Elles
+   n'ont bougé ni au TP 3, ni au TP 4, ni ici. Ce qui n'est pas dans la mémoire
+   n'y sera pas mis par une technique d'orchestration. C'est la limite honnête à
+   annoncer à un client, et c'est le vrai sujet d'une formation sur le RAG.
 
 **6. Tracer le graphe** (facultatif). Avec `LANGSMITH_TRACING=true`, relancez
 trois segments : vous voyez le chemin pris par chacun. C'est la clôture visuelle

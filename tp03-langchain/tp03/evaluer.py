@@ -15,6 +15,7 @@ def evaluer_chaine(avec_verification: bool = False, k: int = 3, n: int = 80) -> 
     from tp02.recherche import chercheur
     from tp03.chaine import chaine_de_correction, construire_chaine, modele_langchain
     from tp03.boucle import traduire_et_corriger
+    from tp03.verification import verifier
 
     memoire = charger_memoire()
     glossaire = corpus.charger_glossaire()
@@ -34,6 +35,12 @@ def evaluer_chaine(avec_verification: bool = False, k: int = 3, n: int = 80) -> 
         else:
             sortie = Sortie(texte=nettoyer_sortie(chaine.invoke(segment["src"])), appels=1,
                             chemin=("chaine",))
+            # On controle quand meme, sans corriger : sinon la ligne « anomalies »
+            # afficherait zero parce qu'on n'a rien cherche, et la comparaison
+            # avec --verifier ne voudrait rien dire.
+            sortie.anomalies = [
+                str(a) for a in verifier(segment["src"], sortie.texte, glossaire)
+            ]
         sortie.secondes = time.perf_counter() - debut
         return sortie
 
@@ -46,9 +53,10 @@ def evaluer_chaine(avec_verification: bool = False, k: int = 3, n: int = 80) -> 
 
     appels = sum(r["appels"] for r in resultats)
     restantes = sum(len(r["anomalies"]) for r in resultats)
+    etiquette_anomalies = "Anomalies restantes  " if avec_verification else "Anomalies detectees  "
     print(f"""
   Appels au modele      {appels} pour {len(resultats)} segments ({appels / len(resultats):.2f} par segment)
-  Anomalies restantes   {restantes}
+  {etiquette_anomalies} {restantes}
 
   Traçage : posez LANGSMITH_TRACING=true et LANGSMITH_API_KEY dans .env, puis
   relancez. Chaque etape de la chaine apparait dans LangSmith sans une ligne de

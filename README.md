@@ -76,6 +76,35 @@ Chaque TP a un **noyau**, qui tient dans la demi-journée, et un **bonus** pour
 ceux qui finissent avant la pause. Le bonus n'est jamais nécessaire au TP
 suivant.
 
+## Ce que la formation démontre, mesuré
+
+`ministral-3:3b` sous Ollama, MacBook Apple Silicon, température 0, 13 septembre
+2026. C'est la table que `python tp.py banc` reconstruit à partir de **vos**
+mesures à vous, à la fin du TP 6.
+
+| Cran | n | BLEU | Termino | Tokens | s/seg | Appels |
+|---|---|---|---|---|---|---|
+| 0 · prompt nu | 20 | 45,5 | 14 % | 85 | 0,96 | 1,00 |
+| 1 · + consigne de style | 20 | 41,3 | 36 % | 211 | 0,74 | 1,00 |
+| 1 · + 3 exemples choisis | 20 | 57,3 | 57 % | 331 | 0,74 | 1,00 |
+| 1b · tout dans le prompt | 8 | 68,9 | 100 % | **4 461** | **3,19** | 1,00 |
+| 2 · RAG lexical k=3 | 20 | 68,2 | 100 % | 343 | 1,12 | 1,00 |
+| 2 · RAG dense k=3 | 20 | **75,7** | 100 % | 343 | 1,09 | 1,00 |
+| 3 · LangChain | 80 | 70,5 | 100 % | — | 1,14 | 1,00 |
+| 3 · + vérification | 80 | 66,8 | 100 % | — | 1,74 | 1,04 |
+| 6 · **graphe routé** | 80 | **75,1** | 100 % | 175 | 1,01 | **0,51** |
+
+Ne comparez que des lignes de même `n`. Sur les 80 segments, le graphe du TP 6
+fait mieux que la chaîne du TP 3 avec **moitié moins d'appels au modèle** — et
+c'est la conclusion de trois jours : le travail n'est pas de trouver le meilleur
+modèle, c'est de **savoir quand ne pas l'appeler**.
+
+Deux résultats ne vont pas dans le sens qu'on attend, et ils sont dans les
+README des TP concernés, expliqués au lieu d'être cachés : la consigne de style
+fait *baisser* BLEU tout en doublant la conformité terminologique, et la boucle
+de correction du TP 3 coûte quatre points de BLEU pour gagner deux points de
+conformité sur les chiffres.
+
 ## Les règles du jeu
 
 **1. Vous restez sur `master`.** Pas de branche, pas de tag, pas de
