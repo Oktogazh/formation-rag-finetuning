@@ -50,52 +50,40 @@ class Garde:
         self.refusees = 0
         self.expirees = 0
 
-    async def executer(self, fonction, *arguments):
-        """Execute ``fonction(*arguments)`` sous protection.
+    async def _lancer(self, fonction, *arguments):
+        """Execute la fonction bloquante hors de la boucle, avec un delai. Fourni.
 
-        ``fonction`` est **bloquante** (elle appelle le modele) : on la lance
-        dans un executeur pour ne pas figer la boucle asyncio. Sans cela, le
-        serveur ne pourrait meme plus repondre a ``/sante`` pendant un calcul.
+        ``fonction`` appelle le modele : si on la lancait directement, la boucle
+        asyncio serait figee et le serveur ne pourrait meme plus repondre a
+        ``/sante`` pendant le calcul.
         """
-        # <<<TODO 2 ★★ Ecrire la garde
-        #! 1. Si self.en_attente >= self.file_max : incrementez self.refusees et
-        #!    levez Sature(...) tout de suite, sans attendre.
-        #! 2. Sinon, incrementez self.en_attente, puis « async with
-        #!    self.semaphore: » ; une fois le jeton obtenu, decrementez
-        #!    self.en_attente.
-        #! 3. Dans le semaphore, lancez la fonction bloquante dans l'executeur :
-        #!       boucle = asyncio.get_running_loop()
-        #!       await asyncio.wait_for(
-        #!           boucle.run_in_executor(None, fonction, *arguments),
-        #!           timeout=self.timeout_s)
-        #!    et rendez son resultat.
-        #! 4. Si asyncio.TimeoutError survient : incrementez self.expirees et
-        #!    levez Delai(...).
-        #! Test : python tp.py test tp05 -k todo2
+        boucle = asyncio.get_running_loop()
+        try:
+            return await asyncio.wait_for(
+                boucle.run_in_executor(None, fonction, *arguments), timeout=self.timeout_s)
+        except asyncio.TimeoutError as erreur:
+            self.expirees += 1
+            raise Delai(f"depassement de {self.timeout_s:.0f} s") from erreur
+
+    async def executer(self, fonction, *arguments):
+        """Execute ``fonction(*arguments)`` sous protection."""
+        # <<<CODE 2 ★★ La regle d'admission
+        #> 1. Si self.en_attente >= self.file_max : incrementez self.refusees et
+        #>    levez Sature(...) TOUT DE SUITE, sans attendre. Refuser en cinq
+        #>    millisecondes vaut mieux que repondre en deux minutes.
+        #> 2. Sinon, incrementez self.en_attente, puis « async with
+        #>    self.semaphore: » ; une fois le jeton obtenu, decrementez
+        #>    self.en_attente et rendez « await self._lancer(fonction, *arguments) ».
+        #> Test : python tp.py test tp05 -k code2
         if self.en_attente >= self.file_max:
             self.refusees += 1
-            raise Sature(
-                f"{self.en_attente} requetes attendent deja (file_max={self.file_max})"
-            )
+            raise Sature(f"{self.en_attente} requetes attendent deja "
+                         f"(file_max={self.file_max})")
         self.en_attente += 1
-        comptee = True
-        try:
-            async with self.semaphore:
-                self.en_attente -= 1
-                comptee = False
-                boucle = asyncio.get_running_loop()
-                try:
-                    return await asyncio.wait_for(
-                        boucle.run_in_executor(None, fonction, *arguments),
-                        timeout=self.timeout_s,
-                    )
-                except asyncio.TimeoutError as erreur:
-                    self.expirees += 1
-                    raise Delai(f"depassement de {self.timeout_s:.0f} s") from erreur
-        finally:
-            if comptee:
-                self.en_attente -= 1
-        # >>>TODO 2
+        async with self.semaphore:
+            self.en_attente -= 1
+            return await self._lancer(fonction, *arguments)
+        # >>>CODE 2
 
     def etat(self) -> dict:
         return {

@@ -57,17 +57,8 @@ def assaillir(url: str, clients: int, duree: float, segments: list[dict],
     verrou = threading.Lock()
     fin = time.perf_counter() + duree
 
-    # <<<TODO 1 ★★ Lancer l'assaut
-    #! Ecrivez la fonction interne « client(rang) » : tant que
-    #! time.perf_counter() < fin, elle appelle _appel(url, <un segment, en
-    #! tournant sur la liste>, clients, timeout) et range le resultat dans
-    #! « appels » — sous le verrou, parce que plusieurs fils ecrivent.
-    #! Puis lancez « clients » exemplaires de cette fonction avec
-    #! ThreadPoolExecutor(max_workers=clients) et attendez-les tous.
-    #! Indice : segments[i % len(segments)] pour tourner sur les segments.
-    #! Indice : list(executeur.map(client, range(clients))) attend la fin.
-    #! Test : python tp.py test tp05 -k todo1
     def client(rang: int) -> None:
+        """Un client : il appelle en boucle jusqu'a la fin du palier. Fourni."""
         i = rang
         while time.perf_counter() < fin:
             resultat = _appel(url, segments[i % len(segments)], clients, timeout)
@@ -76,10 +67,18 @@ def assaillir(url: str, clients: int, duree: float, segments: list[dict],
             i += clients
 
     debut = time.perf_counter()
+    # <<<CODE 1 ★★ Lancer les clients en parallele
+    #> Lancez « clients » exemplaires de la fonction client() ci-dessus, en
+    #> parallele, et attendez qu'ils aient tous fini.
+    #> Indice : with ThreadPoolExecutor(max_workers=clients) as executeur:
+    #>          puis list(executeur.map(client, range(clients)))
+    #> Un seul fil d'execution ne mesurerait rien : c'est la concurrence qui
+    #> fait saturer le service.
+    #> Test : python tp.py test tp05 -k code1
     with ThreadPoolExecutor(max_workers=clients) as executeur:
         list(executeur.map(client, range(clients)))
+    # >>>CODE 1
     ecoule = time.perf_counter() - debut
-    # >>>TODO 1
 
     latences = sorted(a["secondes"] for a in appels)
     codes: dict[int, int] = {}
@@ -149,11 +148,11 @@ def palier_sature(url: str, seuil_p95: float, duree: float = 20.0, maximum: int 
 
     segments = charger_evaluation(n=4)
     # <<<BONUS 5 ★★ Recherche du palier de saturation
-    #! Par dichotomie entre 1 et « maximum » : cherchez le plus grand nombre de
-    #! clients dont le p95 reste sous seuil_p95. Utilisez assaillir(url, n,
-    #! duree, segments) a chaque essai et rendez ce nombre (0 si meme 1 client
-    #! depasse deja le seuil).
-    #! Test : python tp.py test tp05 --bonus -k bonus5
+    #> Par dichotomie entre 1 et « maximum » : cherchez le plus grand nombre de
+    #> clients dont le p95 reste sous seuil_p95. Utilisez assaillir(url, n,
+    #> duree, segments) a chaque essai et rendez ce nombre (0 si meme 1 client
+    #> depasse deja le seuil).
+    #> Test : python tp.py test tp05 --bonus -k bonus5
     bas, haut, reponse = 1, maximum, 0
     while bas <= haut:
         milieu = (bas + haut) // 2

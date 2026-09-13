@@ -57,21 +57,30 @@ def assaillir(url: str, clients: int, duree: float, segments: list[dict],
     verrou = threading.Lock()
     fin = time.perf_counter() + duree
 
-    # <<<TODO 1 ★★ Lancer l'assaut
-    # Ecrivez la fonction interne « client(rang) » : tant que
-    # time.perf_counter() < fin, elle appelle _appel(url, <un segment, en
-    # tournant sur la liste>, clients, timeout) et range le resultat dans
-    # « appels » — sous le verrou, parce que plusieurs fils ecrivent.
-    # Puis lancez « clients » exemplaires de cette fonction avec
-    # ThreadPoolExecutor(max_workers=clients) et attendez-les tous.
-    # Indice : segments[i % len(segments)] pour tourner sur les segments.
-    # Indice : list(executeur.map(client, range(clients))) attend la fin.
-    # Test : python tp.py test tp05 -k todo1
+    def client(rang: int) -> None:
+        """Un client : il appelle en boucle jusqu'a la fin du palier. Fourni."""
+        i = rang
+        while time.perf_counter() < fin:
+            resultat = _appel(url, segments[i % len(segments)], clients, timeout)
+            with verrou:
+                appels.append(resultat)
+            i += clients
+
+    debut = time.perf_counter()
+    # <<<CODE 1 ★★ Lancer les clients en parallele
+    # Lancez « clients » exemplaires de la fonction client() ci-dessus, en
+    # parallele, et attendez qu'ils aient tous fini.
+    # Indice : with ThreadPoolExecutor(max_workers=clients) as executeur:
+    # puis list(executeur.map(client, range(clients)))
+    # Un seul fil d'execution ne mesurerait rien : c'est la concurrence qui
+    # fait saturer le service.
+    # Test : python tp.py test tp05 -k code1
     raise NotImplementedError(
-        "TODO 1 — a completer. Consigne juste au-dessus, "
-        "explications dans tp05-mise-en-service/README.md"
+        "CODE 1 — à compléter. La consigne est juste au-dessus, "
+        "le détail dans tp05-mise-en-service/README.md"
     )
-    # >>>TODO 1
+    # >>>CODE 1
+    ecoule = time.perf_counter() - debut
 
     latences = sorted(a["secondes"] for a in appels)
     codes: dict[int, int] = {}
@@ -147,7 +156,7 @@ def palier_sature(url: str, seuil_p95: float, duree: float = 20.0, maximum: int 
     # depasse deja le seuil).
     # Test : python tp.py test tp05 --bonus -k bonus5
     raise NotImplementedError(
-        "BONUS 5 — a completer. Consigne juste au-dessus, "
-        "explications dans tp05-mise-en-service/README.md"
+        "BONUS 5 — à compléter. La consigne est juste au-dessus, "
+        "le détail dans tp05-mise-en-service/README.md"
     )
     # >>>BONUS 5

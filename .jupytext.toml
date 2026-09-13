@@ -1,0 +1,5 @@
+# Le notebook et son module Python sont appariés : vous éditez le .ipynb,
+# le .py suit, et c'est le .py que les tests importent et que git versionne.
+formats = "ipynb,py:percent"
+notebook_metadata_filter = "-all"
+cell_metadata_filter = "-all"

@@ -5,4 +5,8 @@ __pycache__/
 resultats/*
 !resultats/.gitkeep
 .pytest_cache/
+.ipynb_checkpoints/
+# Les notebooks sont generes depuis les .py : on ne les versionne pas.
+# python tp.py notebooks les (re)fabrique.
+*.ipynb
 .DS_Store

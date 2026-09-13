@@ -103,9 +103,10 @@ def diagnostic() -> dict:
         "encodeur_retenu": encodeur_demande(),
         "cle_mistral": bool(os.environ.get("MISTRAL_API_KEY")),
         "cle_langsmith": bool(os.environ.get("LANGSMITH_API_KEY")),
-        "mlx": find_spec("mlx_lm") is not None,
+        "jupyter": find_spec("jupyterlab") is not None or find_spec("notebook") is not None,
+        "jupytext": find_spec("jupytext") is not None,
+        "torch": find_spec("torch") is not None,
         "peft": find_spec("peft") is not None,
-        "bitsandbytes": find_spec("bitsandbytes") is not None,
         "sentence_transformers": find_spec("sentence_transformers") is not None,
         "url_space": os.environ.get("TP_URL_SPACE", ""),
     }
@@ -122,7 +123,7 @@ def palier(etat: dict | None = None) -> str:
 
 
 def conseils(etat: dict | None = None) -> list[str]:
-    """Les commandes a taper pour completer l'installation, et elles seulement."""
+    """Les commandes à taper pour compléter l'installation, et elles seules."""
     etat = etat or diagnostic()
     a_faire = []
     if not etat["ollama_joignable"] and not etat["cle_mistral"]:
@@ -132,17 +133,16 @@ def conseils(etat: dict | None = None) -> list[str]:
             a_faire.append(f"ollama pull {etat['modele_attendu']}      # 3,0 Go, le traducteur")
         if not etat["embeddings_present"]:
             a_faire.append(f"ollama pull {etat['embeddings_attendu']}                 # 1,2 Go, TP 2")
-    if etat["accelerateur"] == "mps" and not etat["mlx"]:
-        a_faire.append("pip install mlx-lm                     # TP 4, entrainement sur Apple Silicon")
-    if etat["accelerateur"] == "cuda" and not etat["peft"]:
+    if not etat["jupyter"] or not etat["jupytext"]:
+        a_faire.append("conda env update -f environment.yml   # Jupyter manque")
+    if not (etat["torch"] and etat["peft"]):
         a_faire.append(
-            "pip install torch --index-url https://download.pytorch.org/whl/cu124\n"
-            "    pip install transformers peft trl bitsandbytes   # TP 4, entrainement sur NVIDIA"
-        )
+            "pip install torch peft                 # TP 4 seulement, ~250 Mo.\n"
+            "    Aucun GPU n'est nécessaire : le TP 4 entraîne un petit modèle sur\n"
+            "    le processeur, et cela prend quelques minutes.")
     if etat["accelerateur"] == "cpu" and not etat["cle_mistral"]:
         a_faire.append(
-            "Votre machine n'a pas d'accelerateur. Tout fonctionne, mais comptez\n"
-            "    3 a 5 fois plus de temps. Demandez une cle d'API au formateur si\n"
-            "    l'attente devient penible : MISTRAL_API_KEY=... dans .env"
-        )
+            "Votre machine n'a pas d'accélérateur. Tout fonctionne, mais comptez\n"
+            "    trois à cinq fois plus de temps. Demandez une clé d'API au formateur\n"
+            "    si l'attente devient pénible : MISTRAL_API_KEY=... dans .env")
     return a_faire

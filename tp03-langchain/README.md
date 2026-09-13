@@ -1,155 +1,45 @@
 # TP 3 — Orchestrer : chaîne, vérification, correction
 
-**Objectif.** Refaire le RAG du TP 2 avec LangChain, puis ajouter ce qu'une
-chaîne permet et qu'un script rend pénible : un contrôle automatique et une
+**Durée** noyau ≈ 60 min · **Niveau** ★★★☆☆ · **Indépendant** des autres TP
+
+Refaire le RAG avec LangChain, puis ajouter un contrôle automatique et une
 boucle de correction. Et mesurer ce que ça coûte.
 
-**Durée.** Noyau ≈ 60 min · bonus ≈ 15 min · difficulté ★★★☆☆
+## Lancer
 
-## La question honnête, posée d'emblée
-
-LangChain ne traduit pas mieux. **C'est de la plomberie**, et la question au
-bureau sera : qu'est-ce qu'elle apporte, et à quel prix ?
-
-Ce qu'elle apporte, et que ce TP montre :
-
-- un assemblage **déclaratif** : la chaîne se lit comme un schéma, et chaque
-  morceau se remplace sans toucher aux autres ;
-- la même interface pour Ollama, Mistral, OpenAI ou autre chose. Vous avez déjà
-  cette abstraction dans `commun/moteur.py`, écrite à la main en 40 lignes :
-  comparez, c'est instructif dans les deux sens ;
-- **le traçage gratuit** : `LANGSMITH_TRACING=true` dans `.env`, et chaque étape
-  devient visible sans une ligne de code en plus.
-
-Ce qu'elle coûte : une dépendance de plus, des abstractions à apprendre, et une
-pile d'appels difficile à lire quand ça casse.
-
-## Ce que vous allez mesurer
-
-La colonne **Appels** apparaît ici et ne vous quittera plus. Une traduction
-vérifiée puis corrigée, c'est deux appels au lieu d'un. Sur 100 000 segments par
-mois, c'est la ligne que lira la direction financière.
+```bash
+python tp.py notebooks tp03
+jupyter lab
+```
 
 ## Prérequis
 
-Les TP 1 et 2 faits (la chaîne réutilise la recherche et le glossaire filtré).
-`langchain-core`, `langchain-ollama` et `langgraph` sont déjà dans
-l'environnement conda.
+Ollama avec `ministral-3:3b` et `bge-m3`. `langchain-core` et `langchain-ollama`
+sont déjà dans l'environnement conda.
 
-## Déroulé
+Pour l'observation du traçage, le formateur donne une clé LangSmith en séance.
+Sans elle, le TP fonctionne, vous sautez un exercice.
 
-**1. Assembler la chaîne** — TODO 1, dans `tp03/chaine.py`.
+## Les exercices
 
-LCEL (*LangChain Expression Language*) compose des `Runnable` avec l'opérateur
-`|`. `RunnableParallel` calcule plusieurs valeurs à partir d'une entrée,
-`RunnableLambda` enveloppe une fonction ordinaire, `StrOutputParser` extrait le
-texte d'un message.
-
-Le prompt reste celui de `commun/prompts.py`. On ne le réécrit **pas** en
-`ChatPromptTemplate` : ce serait un deuxième format, et le TP 4 entraînera le
-modèle sur le premier.
-
-```bash
-python tp.py test tp03 -k todo1
-python tp.py chaine --n 20
-```
-
-Vous devez retrouver, au bruit près, les chiffres du TP 2 en recherche dense.
-**Si l'écart est grand, quelque chose a changé dans le prompt sans que vous le
-vouliez** — et c'est exactement le genre de dérive que ce TP doit vous apprendre
-à repérer.
-
-**2. Le contrôle** — TODO 2, dans `tp03/verification.py`.
-
-Les quatre contrôles de la procédure de relecture de l'agence
-(`docs/004-procedure-relecture.md`) existent déjà dans `commun/mesure.py`. Ils
-servaient à **noter** ; ici, ils vont **déclencher**. C'est tout le passage d'un
-indicateur à un garde-fou.
-
-**3. La boucle** — TODO 3, dans `tp03/boucle.py`.
-
-Si le contrôle trouve un défaut, on redemande au modèle en lui disant lequel.
-Avec un compteur de tentatives : une boucle d'agent sans compteur est un
-incident de production, pas une audace.
-
-```bash
-python tp.py chaine --verifier --n 20
-```
-
-Comparez les deux tables. Et préparez-vous à un résultat désagréable : voir
-ci-dessous.
-
-## Ce que ça donne — mesuré le 13 septembre 2026
-
-`ministral-3:3b` sous Ollama, recherche dense `k=3`, les 80 segments.
-
-| | BLEU | chrF | Termino | Chiffres | Appels | Anomalies |
-|---|---|---|---|---|---|---|
-| chaîne seule | **70,5** | 84,7 | 100 % | 96 % | 1,00 | 3 détectées |
-| chaîne + vérification | 66,8 | 83,8 | 100 % | **98 %** | 1,04 | 2 restantes |
-
-**La boucle de correction améliore les chiffres et fait perdre 4 points de
-BLEU.** Ce n'est pas une erreur de votre part, et il ne faut pas la cacher :
-c'est le résultat.
-
-Pourquoi ? On demande au modèle de corriger un détail, et il réécrit toute la
-phrase. Elle reste juste, mais elle s'éloigne de la référence, et BLEU compte
-des n-grammes. Trois conclusions, et ce sont des conclusions d'ingénieur :
-
-1. **une correction par modèle de langue n'est pas une opération ciblée.** Si
-   vous voulez changer un nombre, changez le nombre ;
-2. **le bonus 3 est la vraie réponse** : `reparer_sans_modele` corrige les
-   chiffres par un remplacement de texte, sans appel, sans dérive ;
-3. et si votre indicateur de production est la conformité plutôt que BLEU, alors
-   la boucle est un gain net. **Le choix de l'indicateur est une décision
-   métier**, pas une décision technique.
-
-Trois anomalies détectées sur 80 segments, c'est peu — parce que la recherche
-dense du TP 2 fait déjà bien son travail. **Une vérification qui ne trouve rien
-n'est pas inutile** : c'est une garantie, et son prix est de 4 % d'appels en
-plus.
-
-**4. Regarder la chaîne tourner.**
-
-Le formateur vous donne une clé LangSmith pendant la séance. Dans `.env` :
-
-```
-LANGSMITH_TRACING=true
-LANGSMITH_API_KEY=lsv2_...
-LANGSMITH_PROJECT=formation-helios-<votre prénom>
-```
-
-Si le compte est européen, ajoutez
-`LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com`. Sans cette ligne, les
-traces n'arrivent jamais et **rien ne vous le dit** : c'est le piège classique.
-
-Relancez trois segments, ouvrez le projet. Vous voyez le prompt exact, les
-voisins injectés, la réponse, la durée, les tokens. C'est l'outil du TP 5.
-
-## Les TODO
-
-| # | Fichier | Difficulté | Ce qu'on attend | Test |
-|---|---|---|---|---|
-| 1 | `tp03/chaine.py::construire_chaine` | ★★ | la chaîne LCEL complète | `-k todo1` |
-| 2 | `tp03/verification.py::verifier` | ★ | les quatre contrôles en anomalies | `-k todo2` |
-| 3 | `tp03/boucle.py::traduire_et_corriger` | ★★ | la boucle, avec compteur | `-k todo3` |
-
-## Bonus
-
-**BONUS 3** — `reparer_sans_modele` : corriger les chiffres par un remplacement
-de texte, sans rappeler le modèle. Zéro appel, zéro token, et plus fiable qu'un
-second appel — un modèle qui s'est trompé une fois se trompe souvent deux.
-
-La question à se poser à chaque étape d'une chaîne : **ai-je vraiment besoin
-d'un modèle de langue pour ça ?** Au TP 6, la réponse sera « non » pour la
-moitié du corpus.
+| Type | Exercice |
+|---|---|
+| LIRE 1 | les trois briques de LCEL |
+| **CODE 1** | assembler la chaîne |
+| OBS 1 | la chaîne fait-elle la même chose qu'un RAG écrit à la main ? |
+| LIRE 2 | les quatre contrôles de l'agence |
+| RÉG 1 | la boucle de correction, et ce qu'elle dégrade |
+| RÉG 2 | et si on réparait sans appeler le modèle ? |
+| OBS 2 | voir la chaîne tourner dans LangSmith |
+| ARB 1 | que livrez-vous au client ? |
 
 ## Si ça coince
 
-- *Le test todo1 dit que les voisins n'arrivent pas au modèle* → votre
-  `RunnableParallel` calcule bien les voisins, mais le `RunnableLambda` suivant
-  ne les passe pas à `construire`.
-- *`chaine` est beaucoup plus lent que `rag`* → vous avez peut-être laissé la
-  vérification active, ou `num_ctx` n'est pas réglé.
-- *Rien n'apparaît dans LangSmith* → neuf fois sur dix, c'est la région (voir
-  ci-dessus), ou `LANGSMITH_TRACING` absent.
+```bash
+python tp.py test tp03 -k code1
+python tp.py indice tp03 --code 1
+```
+
+- *Rien n'apparaît dans LangSmith* → neuf fois sur dix c'est la région. Un compte
+  européen exige `LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com`, et
+  sans cette ligne les traces n'arrivent jamais sans que rien ne le signale.

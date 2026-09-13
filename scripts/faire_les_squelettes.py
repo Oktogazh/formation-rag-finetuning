@@ -1,28 +1,29 @@
 #!/usr/bin/env python
-"""Fabrique les fichiers d'exercice a partir du corrige.
+"""Fabrique les fichiers d'exercice à partir du corrigé.
 
-Le corrige est la source de verite. Les fichiers que le stagiaire edite en sont
-**derives** : on remplace le contenu de chaque bloc marque par un
-``NotImplementedError``, et on garde la consigne.
+Le corrigé est la source de vérité. Ce que le stagiaire édite en est **dérivé** :
+on remplace le contenu de chaque bloc marqué par un ``NotImplementedError``, et
+on garde la consigne.
 
-    python scripts/faire_les_squelettes.py              # (re)genere
-    python scripts/faire_les_squelettes.py --verifier   # controle, sans ecrire
+    python scripts/faire_les_squelettes.py              # (re)génère
+    python scripts/faire_les_squelettes.py --verifier   # contrôle, sans écrire
 
-Conventions dans le corrige :
+Convention dans le corrigé :
 
-    # <<<TODO 2 ★★ Titre court
-    #! une ligne de consigne
-    #! un analogue a regarder
-    #! Test : python tp.py test tp02 -k todo2
+    # <<<CODE 2 ★★ Titre court
+    #> une ligne de consigne
+    #> un analogue à regarder
+    #> Test : python tp.py test tp02 -k code2
     <le code de la solution>
-    # >>>TODO 2
+    # >>>CODE 2
 
-Les lignes ``#!`` deviennent des commentaires dans le squelette ; le code entre
-elles et le marqueur de fin disparait. Un ``BONUS`` s'ecrit pareil.
+Les lignes ``#>`` deviennent des commentaires ordinaires dans le squelette ; le
+code entre elles et le marqueur de fin disparaît. Un ``BONUS`` s'écrit pareil.
 
-**Un bug se corrige dans ``corrige/``, jamais dans le fichier d'exercice** :
-sinon les deux divergent, ``--verifier`` echoue, et l'indice ne veut plus rien
-dire.
+Pourquoi ``#>`` et pas ``#!`` : jupytext échappe ``#!`` en ``# #!`` à
+l'aller-retour notebook, et le corrigé cesserait de correspondre à l'exercice.
+
+**Un bug se corrige dans ``corrige/``, jamais dans le fichier d'exercice.**
 """
 
 from __future__ import annotations
@@ -33,12 +34,11 @@ import sys
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
-DEBUT = re.compile(r"^(\s*)# <<<(TODO|BONUS) (\d+)\b(.*)$")
-FIN = re.compile(r"^\s*# >>>(TODO|BONUS) (\d+)\b")
+DEBUT = re.compile(r"^(\s*)# <<<(CODE|BONUS) (\d+)\b(.*)$")
+FIN = re.compile(r"^\s*# >>>(CODE|BONUS) (\d+)\b")
 
 
 def squelette(source: str, nom_tp: str) -> str:
-    """Rend le contenu du fichier d'exercice a partir du corrige."""
     lignes = source.splitlines(keepends=True)
     sortie: list[str] = []
     i = 0
@@ -48,22 +48,21 @@ def squelette(source: str, nom_tp: str) -> str:
             sortie.append(lignes[i])
             i += 1
             continue
-
         marge, genre, numero, _ = debut.groups()
         sortie.append(lignes[i])
         i += 1
-        while i < len(lignes) and lignes[i].lstrip().startswith("#!"):
-            nu = lignes[i].lstrip()[2:].lstrip()
-            sortie.append(f"{marge}# {nu}" if nu.strip() else f"{marge}#\n")
+        while i < len(lignes) and lignes[i].lstrip().startswith("#>"):
+            texte = lignes[i].lstrip()[2:].lstrip()
+            sortie.append(f"{marge}# {texte}" if texte.strip() else f"{marge}#\n")
             i += 1
         while i < len(lignes) and not FIN.match(lignes[i]):
             i += 1
         if i >= len(lignes):
-            raise SystemExit(f"Bloc {genre} {numero} jamais referme dans le corrige")
+            raise SystemExit(f"Bloc {genre} {numero} jamais refermé dans {nom_tp}")
         sortie.append(
             f'{marge}raise NotImplementedError(\n'
-            f'{marge}    "{genre} {numero} — a completer. Consigne juste au-dessus, "\n'
-            f'{marge}    "explications dans {nom_tp}/README.md"\n'
+            f'{marge}    "{genre} {numero} — à compléter. La consigne est juste au-dessus, "\n'
+            f'{marge}    "le détail dans {nom_tp}/README.md"\n'
             f'{marge})\n'
         )
         sortie.append(lignes[i])
@@ -73,19 +72,16 @@ def squelette(source: str, nom_tp: str) -> str:
 
 def paires() -> list[tuple[Path, Path, str]]:
     trouvees = []
-    for dossier in sorted((RACINE / "corrige").iterdir()):
-        if not dossier.is_dir():
-            continue
-        for fichier in sorted(dossier.rglob("*.py")):
-            relatif = fichier.relative_to(RACINE / "corrige")
-            trouvees.append((fichier, RACINE / relatif, dossier.name))
+    for fichier in sorted((RACINE / "corrige").rglob("*.py")):
+        relatif = fichier.relative_to(RACINE / "corrige")
+        trouvees.append((fichier, RACINE / relatif, relatif.parts[0]))
     return trouvees
 
 
 def principal(argv=None) -> int:
     analyseur = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     analyseur.add_argument("--verifier", action="store_true",
-                           help="controler que les exercices correspondent au corrige")
+                           help="contrôler que les exercices correspondent au corrigé")
     args = analyseur.parse_args(argv)
 
     ecarts, ecrits, blocs = [], 0, 0
@@ -105,15 +101,14 @@ def principal(argv=None) -> int:
 
     if args.verifier:
         if ecarts:
-            print("Le corrige et les fichiers d'exercice ont divergé :")
+            print("Le corrigé et les fichiers d'exercice ont divergé :")
             for chemin in ecarts:
                 print(f"    {chemin}")
             print("\n  Corrigez dans corrige/, puis relancez sans --verifier.")
             return 1
-        print(f"Corrige et exercices en phase ({len(paires())} fichiers, {blocs} blocs).")
+        print(f"Corrigé et exercices en phase ({len(paires())} fichiers, {blocs} blocs).")
         return 0
-
-    print(f"{ecrits} fichier(s) regénéré(s) sur {len(paires())}, {blocs} blocs a completer.")
+    print(f"{ecrits} fichier(s) régénéré(s) sur {len(paires())}, {blocs} blocs à compléter.")
     return 0
 
 
