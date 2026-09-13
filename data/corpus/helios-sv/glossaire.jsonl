@@ -1,0 +1,7 @@
+{"sv": "hastighetsgräns", "fr": "limite de débit", "interdits": ["limite de vitesse", "limitation de taux", "limitation de débit", "rate limit"]}
+{"sv": "abonnemang", "fr": "formule", "interdits": ["abonnement", "forfait", "plan tarifaire", "souscription"]}
+{"sv": "slutpunkt", "fr": "point de terminaison", "interdits": ["endpoint", "point final", "point d'arrivée", "terminaison finale"]}
+{"sv": "webhook", "fr": "webhook", "interdits": ["crochet web", "hameçon web"]}
+{"sv": "förfråg", "fr": "requête", "interdits": ["demande", "sollicitation", "interrogation"]}
+{"sv": "miljö", "fr": "environnement", "interdits": ["milieu", "cadre", "ambiance"]}
+{"sv": "Företag", "fr": "Företag", "interdits": ["Entreprise", "Société", "Business"]}

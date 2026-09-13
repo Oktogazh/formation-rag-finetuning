@@ -1,0 +1,39 @@
+# Environnement unique de la formation « RAG et fine-tuning d'un LLM » — PLB.
+#
+#   conda env create -f environment.yml
+#   conda activate formation-rag
+#   python tp.py check
+#
+# Volontairement léger (~300 Mo) : ni torch ni sentence-transformers ici.
+# Le modèle de langue ET les embeddings tournent dans Ollama, identique sur
+# Windows, macOS et Linux. Les compléments qui dépendent du matériel (MLX sur
+# Apple Silicon, CUDA + bitsandbytes sur NVIDIA) sont imprimés par
+# `python tp.py check` : n'installez que ce que votre machine réclame.
+#
+# Versions épinglées le 13 septembre 2026, sur macOS 15 / Apple Silicon.
+name: formation-rag
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      # Mesure
+      - sacrebleu>=2.4,<3
+      - numpy>=1.26,<3
+      # Moteurs
+      - ollama>=0.4,<1
+      - mistralai>=1.2,<2
+      # Orchestration (TP 3 et TP 6)
+      - langchain-core>=0.3,<1
+      - langchain-ollama>=0.2,<1
+      - langchain-mistralai>=0.2,<1
+      - langgraph>=0.2,<1
+      - langsmith>=0.1,<1
+      # Mise en service (TP 5)
+      - fastapi>=0.115,<1
+      - uvicorn>=0.30,<1
+      - httpx>=0.27,<1
+      # Outillage
+      - python-dotenv>=1,<2
+      - pytest>=8,<9

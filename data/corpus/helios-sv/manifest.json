@@ -1,0 +1,25 @@
+{
+  "schema": "2.0",
+  "nom": "helios-sv",
+  "domaine": "Documentation technique du logiciel Helios (editeur suedois fictif)",
+  "langues": {
+    "source": "sv",
+    "cible": "fr"
+  },
+  "fictif": true,
+  "documents": 6,
+  "memoire": "tm.jsonl",
+  "glossaire": "glossaire.jsonl",
+  "evaluation": "segments-eval.jsonl",
+  "segments_memoire": 444,
+  "segments_evaluation": 80,
+  "categories_evaluation": {
+    "repetition": 21,
+    "piege": 20,
+    "fuzzy": 18,
+    "nouveau": 21
+  },
+  "revision": "2026-09-13",
+  "verification": "python scripts/verifier_corpus.py",
+  "note": "Corpus entierement fictif, produit pour la formation. Aucun document reel d'entreprise."
+}
