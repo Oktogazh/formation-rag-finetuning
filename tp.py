@@ -435,7 +435,8 @@ def construire_analyseur() -> argparse.ArgumentParser:
     p.set_defaults(fonction=cmd_mur)
 
     p = sous.add_parser("rag", help="TP 2 — ne mettre que ce qui sert")
-    p.add_argument("--recherche", choices=["lexicale", "dense"], default="lexicale")
+    p.add_argument("--recherche", choices=["lexicale", "dense", "hybride"], default="lexicale",
+                   help="« hybride » n'existe qu'une fois le bonus 2 fait")
     p.add_argument("--k", type=int, default=3, help="nombre de voisins injectes")
     p.add_argument("--n", type=int, default=80)
     p.set_defaults(fonction=cmd_rag)
