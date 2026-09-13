@@ -49,6 +49,38 @@ Environ 250 Mo, aucun GPU. Le modèle se télécharge au premier usage (270 Mo).
 | ARB 1 | qu'a appris le modèle ? |
 | BONUS 4 | un exemple sans contexte |
 
+## Ce que ça donne — mesuré le 13 septembre 2026
+
+MacBook Apple Silicon, 355 exemples RAFT, rang 8, une époque : **4,6 minutes
+d'entraînement**, perte 3,10 → 1,67, adaptateur de 1,9 Mo. Puis, sur 20
+segments, avec exactement le même prompt :
+
+| | BLEU | chrF | Termino | Tokens |
+|---|---|---|---|---|
+| avant | 2,1 | 16,2 | 14 % | 463 |
+| après | **38,3** | **45,4** | **43 %** | 463 |
+
+Et par catégorie, c'est là que tout se joue :
+
+| Catégorie | avant | après |
+|---|---|---|
+| `repetition` | 4,4 | **67,2** |
+| `piege` | 4,0 | **77,4** |
+| `fuzzy` | 1,5 | 6,3 |
+| `nouveau` | 1,2 | 5,5 |
+
+**Lisez ces quatre lignes deux fois.** Là où un voisin ressemble au segment, le
+modèle passe de rien à presque tout : il a appris le format, le vocabulaire
+imposé et la façon de se servir du contexte. Là où il n'y a pas de voisin, il
+n'a rien appris du tout — 1,2 à 5,5, c'est du bruit.
+
+C'est la thèse du dernier après-midi, et elle est mesurée sur votre machine :
+**le fine-tuning apprend une forme, pas une connaissance. Il ne remplace pas le
+RAG, il le complète.**
+
+La colonne `Tokens` ne bouge pas non plus : le fine-tuning ne raccourcit pas le
+prompt, contrairement à ce qu'on lit partout.
+
 ## Si ça coince
 
 - *L'entraînement dépasse quinze minutes* → réduisez le jeu :
