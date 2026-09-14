@@ -619,40 +619,16 @@ mur = atelier.mesurer(
 atelier.comparer(("3 exemples (8 seg.)", avec_exemples[:8]), ("le mur (8 seg.)", mur))
 
 # %% [markdown]
-# ## ARB 1 · Votre arbitrage
+# ## Ce que vous emportez
 #
-# Votre consigne fait **monter** la conformité terminologique et **baisser** le
-# BLEU. Aucune des deux mesures n'a tort.
+# Vous avez tout fait à la main au chapitre 0 — tokeniser, embedder, générer,
+# détokeniser — puis vu que le préprompt, seul, fait passer le modèle d'une
+# réponse en suédois à une traduction exploitable. Ensuite vous avez mesuré :
+# une consigne de style fait monter la terminologie et **baisser** BLEU, trois
+# exemples bien choisis valent mieux qu'une longue description, et soixante
+# exemples valent moins que trois.
 #
-# **Écrivez ici, en trois phrases :** laquelle des deux vous défendez devant le
-# client Helios, et pourquoi. Gardez cette réponse — c'est l'indicateur que vous
-# allez suivre pendant trois jours, et on vous la redemandera au TP 6.
-#
-# > *Votre réponse :*
-# >
-# >
-#
-# ---
-#
-# ## Pour aller plus loin, s'il reste du temps
-#
-# `BONUS 1` dans la cellule ci-dessous : au lieu de trois exemples figés,
-# choisissez-les **en fonction du segment à traduire**. Trois lignes, et vous
-# venez d'écrire le TP 2.
-
-# %%
-def exemples_du_domaine(domaine: str, memoire: list[dict]) -> list[dict]:
-    """BONUS — les trois premiers segments de la mémoire de ce domaine."""
-    # <<<BONUS 1 ★ Choisir les exemples en fonction du segment
-    # Rendez les trois premiers segments de « memoire » dont la clé
-    # « domaine » vaut exactement l'argument reçu.
-    # Chaque entrée de la mémoire a les clés : id, src, tgt, domaine, date, statut.
-    # Test : python tp.py test tp01 --bonus -k bonus1
-    raise NotImplementedError(
-        "BONUS 1 — à compléter. La consigne est juste au-dessus, "
-        "le détail dans tp01-prompt/README.md"
-    )
-    # >>>BONUS 1
-
-
-print([s["src"] for s in exemples_du_domaine("cle_rotation", memoire)])
+# Le mur que vous venez de toucher n'est pas un problème de taille de prompt.
+# C'est un problème de **choix**. Il faut donc un moyen de retrouver, pour
+# chaque segment, les quelques exemples qui le concernent — et c'est exactement
+# ce qu'on construit au TP 2.

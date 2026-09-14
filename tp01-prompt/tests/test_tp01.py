@@ -22,15 +22,6 @@ def test_code1_la_consigne_couvre_les_quatre_regles(exercice):
     assert not manquants, f"la consigne ne parle pas de : {', '.join(manquants)}"
 
 
-@pytest.mark.bonus
-@pytest.mark.code
-def test_bonus1_les_exemples_partagent_le_domaine(exercice):
-    memoire = corpus.charger_memoire_brute()
-    exemples = exercice.exemples_du_domaine("cle_rotation", memoire)
-    assert len(exemples) == 3
-    assert {e["domaine"] for e in exemples} == {"cle_rotation"}
-
-
 # --- socle : verts dès le départ, ils valident ce qui est fourni ------------
 def test_le_prompt_nu_contient_le_segment_et_rien_de_plus():
     messages = prompts.construire_messages("Fakturan skickas varje vecka.")

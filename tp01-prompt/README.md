@@ -48,8 +48,6 @@ python -c "from huggingface_hub import snapshot_download as d; d('HuggingFaceTB/
 | OBS 7 | ce que la consigne change — et ce qu'elle dégrade |
 | RÉG 3 | combien d'exemples faut-il montrer ? |
 | OBS 8 | le mur : tout dans le prompt |
-| ARB 1 | quelle métrique défendez-vous ? |
-| BONUS 1 | choisir les exemples en fonction du segment |
 
 ## Si ça coince
 
