@@ -153,25 +153,6 @@ for voisin in rechercher_lexical(segments[0]["src"], memoire, k=3):
 print(f"\n  à traduire : {segments[0]['src']}")
 
 # %% [markdown]
-# ## OBS 2 · Le rappel de la recherche, avant toute génération
-#
-# **C'est la mesure la plus importante du TP, et elle ne fait intervenir aucun
-# modèle.** Sur quelle part des segments le bon voisin est-il dans les `k`
-# retenus ?
-#
-# Ce chiffre est le **plafond** de tout ce qui suit : ce que la recherche ne
-# remonte pas, la génération ne l'inventera pas. Un RAG médiocre est presque
-# toujours un problème de recherche, pas de génération — et on ne le voit que
-# si on mesure les deux séparément.
-
-# %%
-from commun.recherche import rappel
-
-for k in (1, 3, 5):
-    part = rappel(segments, lambda src, k=k: rechercher_lexical(src, memoire, k))
-    print(f"  k = {k} : un voisin à plus de 90 % pour {part:.0f} % des segments")
-
-# %% [markdown]
 # ## CODE 3 · Filtrer le glossaire
 #
 # Le glossaire d'Helios fait 7 entrées. Celui d'un vrai compte client en fait
@@ -237,7 +218,7 @@ def construire(segment_src: str, memoire: list[dict], glossaire: list[dict],
 atelier.montrer_prompt(construire(segments[0]["src"], memoire, glossaire))
 
 # %% [markdown]
-# ## OBS 3 · Mesurer le RAG
+# ## OBS 2 · Mesurer le RAG
 #
 # Mêmes segments qu'au TP 1, même modèle, même température. La seule chose qui
 # change est ce qu'il y a dans le prompt.

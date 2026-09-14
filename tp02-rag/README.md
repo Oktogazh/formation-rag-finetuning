@@ -33,10 +33,9 @@ lexicale, vous ne perdez qu'un exercice.
 | **CODE 1** | ne garder que les segments validés |
 | OBS 1 | ce qu'il y a dans la mémoire |
 | **CODE 2** | la recherche floue, celle de votre outil de TAO |
-| OBS 2 | le rappel de la recherche, avant toute génération |
 | **CODE 3** | filtrer le glossaire sur le segment |
 | **CODE 4** | le prompt augmenté |
-| OBS 3 | mesurer le RAG |
+| OBS 2 | mesurer le RAG |
 | RÉG 1 | combien de voisins ? |
 | RÉG 2 | lexical ou dense ? |
 | LIRE 1 | où sont passés les tokens ? |
