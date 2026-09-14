@@ -79,6 +79,18 @@ def ollama() -> dict:
         return {"joignable": False, "modeles": [], "erreur": str(erreur)}
 
 
+def petit_modele_present() -> bool:
+    """Le petit modèle du chapitre 0 du TP 1 (et du TP 4) est-il téléchargé ?"""
+    if find_spec("transformers") is None:
+        return False
+    try:
+        from commun.petit_modele import est_telecharge
+
+        return est_telecharge()
+    except Exception:
+        return False
+
+
 def diagnostic() -> dict:
     from commun.embeddings import MODELE_EMBEDDINGS, encodeur_demande
     from commun.moteur import MODELE_OLLAMA, moteur_demande
@@ -105,6 +117,8 @@ def diagnostic() -> dict:
         "cle_langsmith": bool(os.environ.get("LANGSMITH_API_KEY")),
         "jupyter": find_spec("jupyterlab") is not None or find_spec("notebook") is not None,
         "jupytext": find_spec("jupytext") is not None,
+        "transformers": find_spec("transformers") is not None,
+        "petit_modele_present": petit_modele_present(),
         "torch": find_spec("torch") is not None,
         "peft": find_spec("peft") is not None,
         "sentence_transformers": find_spec("sentence_transformers") is not None,
@@ -135,6 +149,12 @@ def conseils(etat: dict | None = None) -> list[str]:
             a_faire.append(f"ollama pull {etat['embeddings_attendu']}                 # 1,2 Go, TP 2")
     if not etat["jupyter"] or not etat["jupytext"]:
         a_faire.append("conda env update -f environment.yml   # Jupyter manque")
+    if not etat["petit_modele_present"]:
+        a_faire.append(
+            "python -c \"from huggingface_hub import snapshot_download as d; "
+            "d('HuggingFaceTB/SmolLM2-135M-Instruct')\"\n"
+            "    # 270 Mo. Le petit modèle du chapitre 0 du TP 1, et du TP 4.\n"
+            "    Aucun GPU : il tourne sur le processeur.")
     if not (etat["torch"] and etat["peft"]):
         a_faire.append(
             "pip install torch peft                 # TP 4 seulement, ~250 Mo.\n"

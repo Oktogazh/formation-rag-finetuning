@@ -88,7 +88,11 @@ def cmd_check(args) -> int:
     ligne(f"Modèle {etat['modele_attendu']}", etat["modele_present"], "TP 1 à 6")
     ligne(f"Embeddings {etat['embeddings_attendu']}", etat["embeddings_present"], "TP 2, 3 et 6")
     ligne("Jupyter", etat["jupyter"], "TP 1, 2, 3, 4 et 6")
-    ligne("torch + peft", etat["torch"] and etat["peft"], "TP 4 seulement")
+    ligne("torch + transformers", etat["torch"] and etat["transformers"],
+          "TP 1 chapitre 0, et TP 4")
+    ligne("SmolLM2-135M (270 Mo)", etat["petit_modele_present"],
+          "TP 1 chapitre 0, et TP 4")
+    ligne("peft", etat["peft"], "TP 4 seulement")
     ligne("Clé API Mistral", etat["cle_mistral"], "repli si la machine ne suit pas")
     ligne("Clé LangSmith", etat["cle_langsmith"], "TP 3, 5 et 6, facultatif")
 
@@ -319,6 +323,44 @@ def cmd_banc(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# « test » : nos options d'un côté, celles de pytest de l'autre
+# ---------------------------------------------------------------------------
+OPTIONS_TEST = {"--corrige", "--bonus", "--modele"}
+
+
+def _separer_arguments_pytest(argv: list[str]) -> tuple[list[str], list[str]]:
+    """Coupe la ligne de « test » en deux : ce qui est à nous, ce qui est à pytest.
+
+    Argparse ne sait pas faire ce partage, et aucune de ses deux options ne
+    marche :
+
+    * ``nargs="*"`` refuse tout token qui commence par « - » — ``test tp01 -k
+      code1`` échoue sur « unrecognized arguments: -k code1 », la syntaxe
+      pourtant écrite dans les six README ;
+    * ``nargs=REMAINDER`` accepte ``-k``, mais avale aussi **nos** options :
+      ``test tp01 --bonus -k bonus1`` part alors sans les bonus, sans rien dire,
+      et ``--corrige`` est refilé à pytest qui ne le connaît pas.
+
+    Règle : tout ce qui suit le premier token étranger part à pytest, y compris
+    sa valeur. Un ``--`` isolé sépare explicitement et n'est pas transmis.
+    """
+    if not argv or argv[0] != "test":
+        return argv, []
+    a_nous, a_pytest, bascule = ["test"], [], False
+    for token in argv[1:]:
+        if bascule:
+            a_pytest.append(token)
+        elif token == "--":
+            bascule = True
+        elif token.startswith("-") and token not in OPTIONS_TEST:
+            bascule = True
+            a_pytest.append(token)
+        else:
+            a_nous.append(token)
+    return a_nous, a_pytest
+
+
+# ---------------------------------------------------------------------------
 def construire_analyseur() -> argparse.ArgumentParser:
     analyseur = argparse.ArgumentParser(
         prog="python tp.py",
@@ -340,7 +382,8 @@ def construire_analyseur() -> argparse.ArgumentParser:
     p.add_argument("--corrige", action="store_true", help="jouer la suite sur le corrigé")
     p.add_argument("--bonus", action="store_true", help="inclure les exercices bonus")
     p.add_argument("--modele", action="store_true", help="inclure les tests qui appellent un moteur")
-    p.add_argument("pytest_args", nargs="*", help="arguments passés à pytest (ex : -k code2)")
+    # Rempli par _separer_arguments_pytest, pas par argparse : voir ce commentaire.
+    p.set_defaults(pytest_args=[])
     p.set_defaults(fonction=cmd_test)
 
     p = sous.add_parser("indice", help="le diff entre votre code et le corrigé")
@@ -372,7 +415,11 @@ def construire_analyseur() -> argparse.ArgumentParser:
 
 def principal(argv=None) -> int:
     analyseur = construire_analyseur()
+    argv = list(sys.argv[1:] if argv is None else argv)
+    argv, pour_pytest = _separer_arguments_pytest(argv)
     args = analyseur.parse_args(argv)
+    if getattr(args, "commande", None) == "test":
+        args.pytest_args = pour_pytest
     if not getattr(args, "fonction", None):
         analyseur.print_help()
         return 0

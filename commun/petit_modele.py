@@ -47,6 +47,22 @@ def _torch():
     return torch
 
 
+def est_telecharge() -> bool:
+    """Le petit modèle est-il déjà dans le cache Hugging Face ?
+
+    Il sert **dès le TP 1**, au chapitre 0, pour montrer à la main la
+    tokenisation, l'embedding et la boucle de génération. Le télécharger en
+    salle coûte dix minutes de session : ``python tp.py check`` le vérifie.
+    """
+    try:
+        from huggingface_hub import snapshot_download
+
+        snapshot_download(MODELE_PETIT, local_files_only=True)
+        return True
+    except Exception:
+        return False
+
+
 def charger(adaptateur: str | Path | None = None):
     """Rend ``(modele, tokenizer)``. ``adaptateur`` branche un LoRA entraîné."""
     torch = _torch()

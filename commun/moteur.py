@@ -36,6 +36,7 @@ MODELE_OLLAMA = os.environ.get("TP_OLLAMA_MODELE", "ministral-3:3b")
 MODELE_MISTRAL = os.environ.get("TP_MISTRAL_MODELE", "ministral-3b-latest")
 URL_OLLAMA = os.environ.get("TP_OLLAMA_URL", "http://localhost:11434")
 FENETRE = 8192
+GRAINE = 1234
 
 
 @dataclass
@@ -77,17 +78,25 @@ class MoteurOllama:
         return f"ollama:{self.modele}"
 
     def generer(self, messages, temperature=0.0, max_tokens=256) -> Reponse:
+        options = {
+            "temperature": temperature,
+            "num_ctx": FENETRE,
+            "num_predict": max_tokens,
+        }
+        # La graine n'est posee QU'A temperature 0, et ce detail fait tout
+        # l'exercice REG 1 du TP 1. Avec une graine fixe, Ollama tire toujours
+        # les memes des : on releve alors trois sorties identiques a T = 1.2 et
+        # on en conclut, a tort, que la temperature ne sert a rien. Sans graine,
+        # T = 0 reste reproductible (le tirage est le maximum, il n'y a pas de
+        # des) et T > 0 redevient ce qu'il doit etre : stochastique.
+        if temperature == 0:
+            options["seed"] = GRAINE
         charge = {
             "model": self.modele,
             "messages": messages,
             "stream": False,
             "keep_alive": "10m",
-            "options": {
-                "temperature": temperature,
-                "num_ctx": FENETRE,
-                "num_predict": max_tokens,
-                "seed": 1234,
-            },
+            "options": options,
         }
         requete = urllib.request.Request(
             f"{self.url}/api/chat",
