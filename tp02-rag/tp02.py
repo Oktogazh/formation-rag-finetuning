@@ -7,7 +7,11 @@
 # qu'un prompt de 300. La différence n'était pas la quantité, c'était la
 # **pertinence**. Ici, on ne met dans le prompt que deux choses : les segments
 # de mémoire qui ressemblent à celui qu'on traduit, et les entrées de glossaire
-# qui y apparaissent.
+# qui le concernent.
+#
+# Les deux se cherchent, et vous écrirez les deux recherches : celle des
+# voisins, et celle des termes. La seconde se fait **par vecteurs**, comme le
+# reste du RAG — c'est le même geste appliqué à un autre corpus.
 #
 # **Ce TP ne dépend d'aucun autre.** Si vous n'avez pas fait le TP 1, la
 # consigne de style de référence est dans `commun/consignes.py`, et tout
@@ -157,29 +161,52 @@ for voisin in rechercher_lexical(segments[0]["src"], memoire, k=3):
 print(f"\n  à traduire : {segments[0]['src']}")
 
 # %% [markdown]
-# ## CODE 3 · Filtrer le glossaire
+# ## CODE 3 · Chercher les termes du glossaire, par le sens
 #
 # Le glossaire d'Helios fait 7 entrées. Celui d'un vrai compte client en fait
-# 400, et les coller toutes dans chaque prompt, c'est le mur du TP 1.
+# 400, et les coller toutes dans chaque prompt, c'est le mur du TP 1. On ne
+# garde donc que les entrées qui concernent **ce** segment.
 #
-# On ne garde que les entrées dont le terme suédois apparaît dans **ce** segment.
-# La comparaison se fait par **début de mot**, en minuscules : le suédois compose
-# et fléchit (`förfrågan`, `förfrågningar`), une égalité stricte ne trouverait
-# rien.
+# La façon évidente est de comparer les chaînes : garder les termes qui sont le
+# **début** d'un mot du segment. Ça marche, c'est en trois lignes, et c'est ce
+# que fait `commun/augmenter.py` pour les TP 3, 4 et 6.
+#
+# **Mais le suédois compose.** `testslutpunkten` contient `slutpunkt` sans
+# commencer par lui : un préfixe ne voit que les composés dont le terme est le
+# premier morceau. C'est une limite de forme, pas de réglage — aucun seuil ne
+# la lève.
+#
+# On cherche donc les termes comme on cherche les voisins : **avec des
+# vecteurs**. Un mot du segment et un terme du glossaire deviennent deux points,
+# et on regarde s'ils sont proches.
+#
+# `GlossaireVectoriel` encode les 7 termes une fois à la construction, et garde
+# en cache le vecteur de chaque mot déjà vu. Il vous donne :
+#
+# - `index.glossaire` — les 7 entrées, dans l'ordre ;
+# - `index.vecteurs` — leurs 7 vecteurs, dans le même ordre ;
+# - `index.vecteurs_des_mots(mots)` — les vecteurs de ces mots, cache compris ;
+# - `index.seuil` — le seuil au-delà duquel on retient un terme.
 
 # %%
-import re
+from commun.augmenter import GlossaireVectoriel, mots_de
+from commun.embeddings import cosinus
 
-MOTS = re.compile(r"[\wåäöÅÄÖ]+")
+index_glossaire = GlossaireVectoriel(glossaire)
+print(f"Encodeur : {index_glossaire.nom()} · seuil {index_glossaire.seuil}")
 
 
-def glossaire_pertinent(segment_src: str, glossaire: list[dict]) -> list[dict]:
+def glossaire_pertinent(segment_src: str, index: GlossaireVectoriel,
+                        seuil: float | None = None) -> list[dict]:
     """Les entrées de glossaire qui concernent ce segment, et elles seules."""
-    mots = [m.lower() for m in MOTS.findall(segment_src)]
-    # <<<CODE 3 ★ Filtrer le glossaire
-    # Rendez les entrées dont le terme suédois (clé "sv", en minuscules) est le
-    # DÉBUT d'au moins un des mots ci-dessus.
-    # Indice : mot.startswith(terme) — et .lower() sur les deux.
+    seuil = index.seuil if seuil is None else seuil
+    vecteurs = index.vecteurs_des_mots(mots_de(segment_src))
+    # <<<CODE 3 ★★ Chercher les termes par le sens
+    # Pour chaque terme du glossaire et son vecteur — zip(index.glossaire,
+    # index.vecteurs) — prenez le MEILLEUR cosinus entre ce vecteur et les
+    # vecteurs des mots du segment. Gardez les termes dont ce score atteint le
+    # seuil, sous la forme {**terme, "score": score}, du plus sûr au moins sûr.
+    # Indice : max((cosinus(v, vecteur) for v in vecteurs), default=0.0)
     # Test : python tp.py test tp02 -k code3
     raise NotImplementedError(
         "CODE 3 — à compléter. La consigne est juste au-dessus, "
@@ -189,9 +216,75 @@ def glossaire_pertinent(segment_src: str, glossaire: list[dict]) -> list[dict]:
 
 
 exemple = "Hastighetsgränsen är satt till 60 förfrågningar per minut."
-print(exemple)
-for terme in glossaire_pertinent(exemple, glossaire):
-    print(f"  {terme['sv']} → {terme['fr']}")
+print(f"\n{exemple}")
+for terme in glossaire_pertinent(exemple, index_glossaire):
+    print(f"  {terme['score']:.3f}  {terme['sv']} → {terme['fr']}")
+
+# %% [markdown]
+# ## OBS 2 · Ce que les vecteurs voient, et ce qu'ils coûtent
+#
+# Trois choses à relever, dans l'ordre.
+#
+# **1. Le mot composé.** `Testslutpunkten` ne commence pas par `slutpunkt`, donc
+# le début de mot ne trouve rien — et pourtant la traduction de référence dit
+# bien « point de terminaison ». Les vecteurs l'attrapent. C'est le seul cas du
+# corpus : un gain réel, mais mesurez-le avant d'en faire un argument.
+#
+# **2. Le suédois et le français ne sont pas au même endroit.** On encode
+# maintenant les deux côtés du glossaire. Les deux colonnes disent la même
+# chose, et pourtant le cosinus n'est pas de 1 : un vecteur encode une chaîne,
+# pas un sens pur. Regardez surtout `abonnemang` → `formule`.
+#
+# **3. Le cache.** Les 80 segments font 645 mots, mais beaucoup moins de mots
+# **distincts**. Sans cache, on paierait un encodage par occurrence.
+
+# %%
+# --- 1. le mot composé, que le début de mot ne peut pas voir ---------------
+from commun.augmenter import glossaire_pertinent as par_debut_de_mot
+
+tous = corpus.charger_evaluation()          # les 80, pas l'échantillon de 20
+compose = next(s for s in tous if "Testslutpunkten" in s["src"])
+print(f"  {compose['src']}")
+print(f"  {compose['tgt']}")
+print(f"    début de mot : {[t['sv'] for t in par_debut_de_mot(compose['src'], glossaire)]}")
+print(f"    vecteurs     : "
+      f"{[(t['sv'], round(t['score'], 3)) for t in glossaire_pertinent(compose['src'], index_glossaire)]}")
+
+# --- 2. la source et la cible du glossaire, encodées toutes les deux -------
+vecteurs_fr = index_glossaire.encodeur.encoder([t["fr"] for t in glossaire])
+print(f"\n  {'suédois':<18} {'français':<22} {'cos(sv, fr)':>11}")
+for terme, vecteur_sv, vecteur_fr in zip(glossaire, index_glossaire.vecteurs, vecteurs_fr):
+    print(f"  {terme['sv']:<18} {terme['fr']:<22} {cosinus(vecteur_sv, vecteur_fr):>11.3f}")
+
+print("\n  Et si on part du français, retombe-t-on sur son suédois ?")
+for i, terme in enumerate(glossaire):
+    classe = sorted(zip((cosinus(vecteurs_fr[i], v) for v in index_glossaire.vecteurs),
+                        (t["sv"] for t in glossaire)), reverse=True)
+    verdict = "oui" if classe[0][1] == terme["sv"] else f"NON → {classe[0][1]}"
+    print(f"    {terme['fr']:<22} {verdict}")
+
+# --- 3. ce que le cache économise -----------------------------------------
+import time
+
+index_neuf = GlossaireVectoriel(glossaire)
+
+depart = time.time()
+for segment in tous:
+    glossaire_pertinent(segment["src"], index_neuf)
+premier, encodes_1, evites_1 = time.time() - depart, index_neuf.encodes, index_neuf.evites
+
+depart = time.time()
+for segment in tous:
+    glossaire_pertinent(segment["src"], index_neuf)
+second = time.time() - depart
+encodes_2 = index_neuf.encodes - encodes_1
+
+mots_par_passage = encodes_1 + evites_1
+print(f"\n  {len(tous)} segments, {mots_par_passage} mots par passage")
+print(f"    passage 1 : {encodes_1:>4} mots encodés, {evites_1:>4} pris au cache"
+      f"  ({100 * evites_1 / mots_par_passage:.0f} %)   {premier:.2f} s")
+print(f"    passage 2 : {encodes_2:>4} mots encodés, {mots_par_passage:>4} pris au cache"
+      f"  (100 %)   {second:.2f} s   ×{premier / max(second, 1e-9):.0f}")
 
 # %% [markdown]
 # ## CODE 4 · Le prompt augmenté
@@ -208,11 +301,11 @@ for terme in glossaire_pertinent(exemple, glossaire):
 # Allez lire `commun/prompts.py` avant d'écrire cette cellule. C'est une page.
 
 # %%
-def construire(segment_src: str, memoire: list[dict], glossaire: list[dict],
+def construire(segment_src: str, memoire: list[dict], index: GlossaireVectoriel,
                k: int = 3) -> list[dict]:
     """Le prompt augmenté pour ce segment."""
     voisins = rechercher_lexical(segment_src, memoire, k)
-    termes = glossaire_pertinent(segment_src, glossaire)
+    termes = glossaire_pertinent(segment_src, index)
     # <<<CODE 4 ★ Appeler le gabarit commun
     # Rendez construire_messages(...) avec, dans l'ordre : le segment source,
     # voisins=voisins, glossaire=termes, consignes=CONSIGNE_STYLE.
@@ -224,10 +317,10 @@ def construire(segment_src: str, memoire: list[dict], glossaire: list[dict],
     # >>>CODE 4
 
 
-atelier.montrer_prompt(construire(segments[0]["src"], memoire, glossaire))
+atelier.montrer_prompt(construire(segments[0]["src"], memoire, index_glossaire))
 
 # %% [markdown]
-# ## OBS 2 · Mesurer le RAG
+# ## OBS 3 · Mesurer le RAG
 #
 # Mêmes segments qu'au TP 1, même modèle, même température. La seule chose qui
 # change est ce qu'il y a dans le prompt.
@@ -240,7 +333,7 @@ atelier.montrer_prompt(construire(segments[0]["src"], memoire, glossaire))
 rag_lexical = atelier.mesurer(
     "tp02-rag-lexical",
     segments,
-    atelier.traducteur(moteur, lambda src: construire(src, memoire, glossaire, k=3)),
+    atelier.traducteur(moteur, lambda src: construire(src, memoire, index_glossaire, k=3)),
     titre="RAG — recherche lexicale, k=3",
 )
 
@@ -259,7 +352,7 @@ K = 5
 rag_k = atelier.mesurer(
     f"tp02-rag-k{K}",
     segments,
-    atelier.traducteur(moteur, lambda src: construire(src, memoire, glossaire, k=K)),
+    atelier.traducteur(moteur, lambda src: construire(src, memoire, index_glossaire, k=K)),
     titre=f"RAG — recherche lexicale, k={K}",
     enregistrer=False,
 )
@@ -289,7 +382,7 @@ rag_dense = atelier.mesurer(
     "tp02-rag-dense",
     segments,
     atelier.traducteur(moteur, lambda src: construire_messages(
-        src, voisins=chercher(src), glossaire=glossaire_pertinent(src, glossaire),
+        src, voisins=chercher(src), glossaire=glossaire_pertinent(src, index_glossaire),
         consignes=CONSIGNE_STYLE)),
     titre=f"RAG — recherche {METHODE}, k=3",
 )
@@ -310,7 +403,8 @@ atelier.par_categorie(("lexical", rag_lexical), ("dense", rag_dense))
 #    votre RAG ?
 #
 # La troisième réponse est la seule ligne de ce TP qu'une direction financière
-# lira.
+# lira. Comptez-y l'encodage des mots : il se paie une fois par mot distinct,
+# pas une fois par segment — c'est le chiffre d'OBS 2.
 
 # %%
 atelier.comparer(("RAG lexical k=3", rag_lexical), ("RAG dense k=3", rag_dense))
@@ -331,25 +425,19 @@ atelier.comparer(("RAG lexical k=3", rag_lexical), ("RAG dense k=3", rag_dense))
 #
 # ---
 #
-# ## Pour aller plus loin, s'il reste du temps
+# ## ARB 2 · Et le glossaire, fallait-il des vecteurs ?
 #
-# En production on combine presque toujours les deux : le lexical attrape les
-# références exactes (numéros de version, noms de formule), le dense attrape les
-# reformulations.
-
-# %%
-def rechercher_hybride(segment_src: str, memoire: list[dict], index, k: int = 3,
-                       alpha: float = 0.5) -> list[dict]:
-    """BONUS — mélanger le score dense et le score lexical."""
-    denses = {s["id"]: s["score"] for s in index.chercher(segment_src, k=len(memoire))}
-    # <<<BONUS 2 ★★ Recherche hybride
-    # Pour chaque segment de la mémoire, calculez
-    # alpha * denses[segment["id"]] + (1 - alpha) * similarite(segment_src, segment["src"])
-    # rangez par score décroissant, rendez les k premiers — même forme de
-    # sortie que rechercher_lexical.
-    # Test : python tp.py test tp02 --bonus -k bonus2
-    raise NotImplementedError(
-        "BONUS 2 — à compléter. La consigne est juste au-dessus, "
-        "le détail dans tp02-rag/README.md"
-    )
-    # >>>BONUS 2
+# Vous venez d'écrire deux filtres de glossaire : un début de mot en trois
+# lignes, et une recherche vectorielle qui demande un encodeur, un cache et un
+# seuil. Sur les 80 segments, l'écart tient en **un** mot composé.
+#
+# **Deux phrases :** ce gain vaut-il cette dépendance pour Helios ? Et votre
+# réponse changerait-elle pour un client dont le glossaire fait 400 entrées et
+# dont la langue compose autant que le suédois — l'allemand, le finnois ?
+#
+# La bonne réponse n'est pas la même dans les deux cas, et c'est tout l'intérêt
+# de la question.
+#
+# > *Votre réponse :*
+# >
+# >

@@ -3,15 +3,27 @@
 import pytest
 
 from commun import corpus
+from commun.augmenter import GlossaireVectoriel
+from commun.embeddings import EncodeurFactice
 from commun.recherche import similarite
 
 PROCHE = "Abonnemanget Företag tillåter 28 förfrågningar per minut."
 GLOSSAIRE = "Hastighetsgränsen är satt till 60 förfrågningar per minut."
 
+# L'encodeur des tests hache des trigrammes : il sépare vers 0,55, là où
+# bge-m3 sépare vers 0,75. Le seuil appartient à l'encodeur, pas à la tâche.
+SEUIL_FACTICE = 0.55
+
 
 @pytest.fixture(scope="module")
 def memoire():
     return corpus.charger_memoire_brute()
+
+
+@pytest.fixture(scope="module")
+def index_glossaire():
+    return GlossaireVectoriel(corpus.charger_glossaire(),
+                              encodeur=EncodeurFactice(), seuil=SEUIL_FACTICE)
 
 
 @pytest.mark.code
@@ -33,16 +45,30 @@ def test_code2_la_recherche_lexicale_remonte_le_bon_voisin(exercice, memoire):
 
 
 @pytest.mark.code
-def test_code3_le_glossaire_est_filtre_sur_le_segment(exercice):
-    glossaire = corpus.charger_glossaire()
-    retenus = exercice.glossaire_pertinent(GLOSSAIRE, glossaire)
+def test_code3_le_glossaire_est_cherche_par_vecteurs(exercice, index_glossaire):
+    retenus = exercice.glossaire_pertinent(GLOSSAIRE, index_glossaire)
     assert {t["sv"] for t in retenus} == {"hastighetsgräns", "förfråg"}
-    assert exercice.glossaire_pertinent("Fakturan skickas varje vecka.", glossaire) == []
+    scores = [t["score"] for t in retenus]
+    assert scores == sorted(scores, reverse=True), "les termes doivent être rangés"
+    assert all(s >= index_glossaire.seuil for s in scores), "sous le seuil, on ne garde pas"
+    assert exercice.glossaire_pertinent("Fakturan skickas varje vecka.", index_glossaire) == []
 
 
 @pytest.mark.code
-def test_code4_le_prompt_augmente_contient_voisins_et_glossaire(exercice, memoire):
-    messages = exercice.construire(PROCHE, memoire, corpus.charger_glossaire(), k=2)
+def test_code3_le_mot_compose_que_le_prefixe_ne_voit_pas(exercice, index_glossaire):
+    """``testslutpunkten`` contient ``slutpunkt`` sans commencer par lui."""
+    from commun.augmenter import glossaire_pertinent as par_debut_de_mot
+
+    compose = "Testslutpunkten förbrukar inte din kvot."
+    assert par_debut_de_mot(compose, corpus.charger_glossaire()) == []
+    retenus = exercice.glossaire_pertinent(compose, index_glossaire)
+    assert "slutpunkt" in {t["sv"] for t in retenus}
+
+
+@pytest.mark.code
+def test_code4_le_prompt_augmente_contient_voisins_et_glossaire(exercice, memoire,
+                                                                index_glossaire):
+    messages = exercice.construire(PROCHE, memoire, index_glossaire, k=2)
     texte = messages[1]["content"]
     assert [m["role"] for m in messages] == ["system", "user"]
     assert "### Glossaire impose" in texte and "### Memoire de traduction" in texte
@@ -51,21 +77,31 @@ def test_code4_le_prompt_augmente_contient_voisins_et_glossaire(exercice, memoir
     assert "vous" in messages[0]["content"].lower(), "la consigne de style doit être là"
 
 
-@pytest.mark.bonus
-@pytest.mark.code
-def test_bonus2_la_recherche_hybride_melange_les_deux_scores(exercice, memoire):
-    from commun.embeddings import EncodeurFactice
-    from commun.recherche import Index
-
-    echantillon = memoire[:40]
-    index = Index.construire(echantillon, encodeur=EncodeurFactice(), cache=False)
-    cible = echantillon[3]
-    voisins = exercice.rechercher_hybride(cible["src"], echantillon, index, k=3, alpha=0.5)
-    assert voisins[0]["id"] == cible["id"]
-    assert voisins[0]["score"] == pytest.approx(1.0, abs=1e-3)
-
-
 # --- socle ------------------------------------------------------------------
+def test_le_cache_du_glossaire_evite_de_reencoder(index_glossaire):
+    """Deux fois le même segment ne coûte qu'un encodage de ses mots."""
+    phrase = "Du kan skapa upp till 5 integrationer per abonnemang."
+    index_glossaire.chercher(phrase)
+    encodes = index_glossaire.encodes
+    index_glossaire.chercher(phrase)
+    assert index_glossaire.encodes == encodes, "le second passage ne réencode rien"
+
+
+def test_le_glossaire_encode_ses_deux_langues(index_glossaire):
+    """Source et cible disent la même chose sans avoir le même vecteur."""
+    from commun.embeddings import cosinus
+
+    glossaire = corpus.charger_glossaire()
+    vecteurs_fr = index_glossaire.encodeur.encoder([t["fr"] for t in glossaire])
+    for terme, sv, fr in zip(glossaire, index_glossaire.vecteurs, vecteurs_fr):
+        proximite = cosinus(sv, fr)
+        if terme["sv"].lower() == terme["fr"].lower():
+            assert proximite == pytest.approx(1.0, abs=1e-6), terme["sv"]
+        else:
+            assert proximite < 1.0, f"{terme['sv']} et {terme['fr']} ne sont pas le même point"
+
+
+
 def test_le_corpus_respecte_son_schema(memoire):
     assert len(memoire) == 444
     for segment in memoire[:20]:

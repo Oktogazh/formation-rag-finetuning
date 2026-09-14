@@ -115,6 +115,15 @@ def _normaliser(vecteur):
     return [float(v) / norme for v in vecteur]
 
 
+def cosinus(a, b) -> float:
+    """Le cosinus de deux vecteurs **deja normalises** : un produit scalaire.
+
+    Les trois encodeurs d'ici rendent des vecteurs de norme 1. Le cosinus se
+    reduit donc a une multiplication et une somme, sans division.
+    """
+    return sum(x * y for x, y in zip(a, b))
+
+
 def encodeur_demande() -> str:
     choix = os.environ.get("TP_EMBEDDINGS", "auto").lower()
     if choix in ("factice", "ollama", "sentence-transformers"):

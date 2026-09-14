@@ -23,8 +23,14 @@ ollama pull bge-m3
 ```
 
 1,2 Go, multilingue : il place le suédois et le français dans le même espace
-vectoriel. Si le téléchargement échoue, tout le TP se fait en recherche
-lexicale, vous ne perdez qu'un exercice.
+vectoriel. **Il n'est plus optionnel** : depuis que le glossaire se cherche par
+vecteurs (CODE 3), les exercices 3 et 4 en dépendent.
+
+Si le téléchargement échoue le jour même, lancez le notebook avec
+`TP_EMBEDDINGS=factice` : un encodeur de secours en Python pur prend le relais.
+Il hache des trigrammes au lieu de comprendre le sens, donc il sépare vers
+**0,55** et non 0,75 — passez le seuil en argument. Vous ferez tous les
+exercices, mais pas la démonstration multilingue d'OBS 2.
 
 ## Les exercices
 
@@ -33,14 +39,15 @@ lexicale, vous ne perdez qu'un exercice.
 | **CODE 1** | ne garder que les segments validés |
 | OBS 1 | ce qu'il y a dans la mémoire |
 | **CODE 2** | la recherche floue, celle de votre outil de TAO |
-| **CODE 3** | filtrer le glossaire sur le segment |
+| **CODE 3** | chercher les termes du glossaire, par le sens |
+| OBS 2 | ce que les vecteurs voient, et ce qu'ils coûtent |
 | **CODE 4** | le prompt augmenté |
-| OBS 2 | mesurer le RAG |
+| OBS 3 | mesurer le RAG |
 | RÉG 1 | combien de voisins ? |
 | RÉG 2 | lexical ou dense ? |
 | LIRE 1 | où sont passés les tokens ? |
-| ARB 1 | lequel recommandez-vous pour Helios ? |
-| BONUS 2 | recherche hybride |
+| ARB 1 | lexical ou dense pour Helios ? |
+| ARB 2 | le glossaire méritait-il des vecteurs ? |
 
 ## Si ça coince
 
@@ -50,5 +57,11 @@ python tp.py indice tp02 --code 2
 python tp.py rattraper tp02
 ```
 
-- *Le test `code3` attend 2 entrées et j'en ai 0* → la comparaison se fait en
-  minuscules et par **début de mot** : `förfrågningar` commence par `förfråg`.
+- *Le test `code3` attend 2 entrées et j'en ai 0* → vous comparez sans doute le
+  segment entier au terme. Il faut comparer **mot à mot** : le meilleur cosinus
+  entre un mot du segment et le terme. Une phrase de dix mots n'est jamais
+  proche d'un mot isolé.
+- *`code3` me rend les 7 termes* → le seuil n'est pas appliqué, ou il est trop
+  bas. `index.seuil` vaut 0,75 avec `bge-m3`.
+- *Ollama ne répond pas* → `ollama serve`, puis `ollama pull bge-m3`. En
+  dépannage, `TP_EMBEDDINGS=factice` avec un seuil de 0,55.
