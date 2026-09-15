@@ -165,6 +165,31 @@ for cle, valeur in demo.invoke("Fakturan skickas varje vecka.").items():
     print(f"  {cle:12} {valeur}")
 
 # %% [markdown]
+# **Réponses.**
+#
+# 1. `RunnableParallel` reçoit **une seule entrée** — ici la chaîne suédoise —
+#    et la **transmet telle quelle à chacune de ses branches** : aucune branche
+#    ne voit la sortie d'une autre, elles lisent toutes la même entrée. Il rend
+#    **un dict**, une clé par branche, chaque valeur étant ce que cette branche
+#    a produit à partir de cette entrée commune.
+# 2. `RunnablePassthrough` fait passer l'entrée sans la modifier — c'est
+#    justement pour ça qu'il sert : puisqu'une branche du `RunnableParallel` ne
+#    reçoit que l'entrée d'origine, il faut une branche dédiée pour la
+#    conserver telle quelle à côté des valeurs calculées par les autres
+#    branches. C'est le rôle qu'il joue dans la chaîne de CODE 1 : garder le
+#    segment suédois brut disponible pour `construire(...)`, à côté des
+#    voisins et des termes du glossaire.
+# 3. Aucun ordre garanti : LangChain **exécute les branches d'un
+#    `RunnableParallel` en parallèle** (le protocole `Runnable` les lance dans
+#    un pool de threads pour `invoke`, en tâches asyncio pour `ainvoke`), pas
+#    séquentiellement de haut en bas comme le suggère l'écriture du dict. Ça ne
+#    change rien ici — et dans la chaîne de CODE 1 — parce qu'aucune branche
+#    n'a d'effet de bord ni ne dépend du résultat d'une autre : ce sont trois
+#    lectures indépendantes de la même entrée. Ça compterait si une branche
+#    modifiait un état partagé ou si on comptait sur un ordre précis (pour du
+#    logging, par exemple).
+
+# %% [markdown]
 # ## CODE 1 · Assembler la chaîne
 #
 # La chaîne s'invoque avec **une chaîne de caractères** (le segment suédois) et
@@ -262,6 +287,37 @@ for candidate in ["La formule Bas autorise 20 requêtes par minute.",
     anomalies = verifier(source, candidate, glossaire)
     print(f"  {candidate}")
     print(f"      → {[str(a) for a in anomalies] or 'rien à redire'}")
+
+# %% [markdown]
+# **Réponses.**
+#
+# 1. **`terminologie`** : le glossaire associe à chaque terme fr des synonymes
+#    `interdits` (ici « abonnement » interdit pour le terme attendu
+#    « formule »). Le contrôle passe la traduction en minuscules et cherche
+#    d'abord le terme correct, puis, s'il est absent, un interdit — c'est ce
+#    deuxième cas qui produit l'anomalie « "abonnement" au lieu de "formule" ».
+# 2. **`chiffres`** : il extrait tous les `\d+` de la source et de la
+#    traduction avec la même regex, trie les deux listes, et compare. « 180 »
+#    côté source contre « 14 » côté traduction donne deux listes différentes,
+#    donc une anomalie — exactement le cas de « 50 » à la place de « 20 » dans
+#    la cellule au-dessus.
+# 3. **`balises`** : la regex `\{\d+\}|<[^>]{1,40}>|%[sd]` ne trouve **aucune**
+#    occurrence dans tout le corpus Helios (`tm.jsonl`, `segments-eval.jsonl`) —
+#    ces marqueurs n'apparaissent que dans la documentation *de* la procédure,
+#    jamais dans les segments à traduire. Source et traduction produisent donc
+#    toujours deux listes vides, `sorted([]) == sorted([])` est toujours vrai,
+#    et le contrôle ne se déclenche jamais sur ce corpus — pas parce qu'il est
+#    inutile, mais parce que le TP ne fournit aucun segment avec placeholder.
+#
+# Le lien avec la chaîne LangChain construite plus haut : `verifier` ne fait
+# rien à ce stade — la cellule ci-dessus ne fait qu'illustrer la fonction en
+# isolation, sans toucher `chaine`. Le passage de « noter » à « déclencher »
+# se joue dans la cellule suivante (RÉG 1) : chaque anomalie qu'il remonte y
+# devient la raison d'un second `chaine.invoke(...)`, avec le détail de
+# l'anomalie glissé dans le prompt de relance. `verifier` est donc la
+# condition d'arrêt d'une boucle *autour* de la chaîne LCEL, pas un maillon
+# de la chaîne elle-même — c'est pour ça qu'il vit hors du `RunnableParallel`
+# vu en LIRE 1.
 
 # %% [markdown]
 # ## RÉG 1 · La boucle de correction
