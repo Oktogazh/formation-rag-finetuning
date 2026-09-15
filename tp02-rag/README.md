@@ -29,8 +29,9 @@ vecteurs (CODE 3), les exercices 3 et 4 en dépendent.
 Si le téléchargement échoue le jour même, lancez le notebook avec
 `TP_EMBEDDINGS=factice` : un encodeur de secours en Python pur prend le relais.
 Il hache des trigrammes au lieu de comprendre le sens, donc il sépare vers
-**0,55** et non 0,75 — passez le seuil en argument. Vous ferez tous les
-exercices, mais pas la démonstration multilingue d'OBS 2.
+**0,55** et non 0,75 — `GlossaireVectoriel` applique ce seuil tout seul, le
+seuil étant attaché à l'encodeur. Vous ferez tous les exercices, mais pas la
+démonstration multilingue d'OBS 2.
 
 ## Les exercices
 
@@ -47,7 +48,9 @@ exercices, mais pas la démonstration multilingue d'OBS 2.
 | RÉG 2 | lexical ou dense ? |
 | LIRE 1 | où sont passés les tokens ? |
 | ARB 1 | lexical ou dense pour Helios ? |
-| ARB 2 | le glossaire méritait-il des vecteurs ? |
+| ARB 2 | chercher le glossaire, à quel prix ? |
+| *BONUS 2* | *découper un document en chunks* |
+| *OBS 4* | *le document devient une mémoire de traduction* |
 
 ## Si ça coince
 

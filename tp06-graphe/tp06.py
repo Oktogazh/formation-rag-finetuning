@@ -52,7 +52,7 @@ from typing import Annotated, TypedDict
 from langgraph.graph import END, StateGraph
 
 from commun import atelier, corpus
-from commun.augmenter import construire, glossaire_pertinent
+from commun.augmenter import GlossaireVectoriel, construire
 from commun.consignes import CONSIGNE_STYLE
 from commun.memoire import charger_memoire
 from commun.moteur import obtenir_moteur
@@ -65,6 +65,7 @@ MAX_TENTATIVES = 2
 
 memoire = charger_memoire()
 glossaire = corpus.charger_glossaire()
+index_glossaire = GlossaireVectoriel(glossaire)
 segments = atelier.segments(n=20)
 moteur = obtenir_moteur()
 chercher = chercheur(memoire, "dense", k=3)
@@ -123,7 +124,7 @@ def reutiliser(etat):
 
 def recuperer(etat):
     return {"voisins": chercher(etat["segment"]),
-            "glossaire": glossaire_pertinent(etat["segment"], glossaire),
+            "glossaire": index_glossaire.chercher(etat["segment"]),
             "chemin": ["recuperer"]}
 
 

@@ -1,25 +1,20 @@
-"""Construire le prompt augmenté : glossaire filtré, voisins, segment.
+"""Construire le prompt augmenté : glossaire cherché, voisins, segment.
 
-Le glossaire se filtre de deux façons, et le TP 2 vous fait écrire la seconde.
+Le glossaire se cherche **par vecteurs**, comme tout le reste du RAG. On encode
+les termes une fois, on encode les mots du segment, et on garde les termes dont
+un mot s'approche à plus de ``seuil``.
 
-**Par début de mot** (``glossaire_pertinent``). Trois lignes, aucune dépendance.
-C'est ce qui sert aux TP 3, 4 et 6, pour qu'ils tournent sans modèle
-d'embeddings. C'est aussi ce que mesure ``commun.mesure.termes_attendus``.
-
-**Par vecteurs** (``GlossaireVectoriel``). On encode les termes une fois, on
-encode les mots du segment, on garde les termes dont un mot s'approche à plus
-de ``SEUIL_GLOSSAIRE``. Mesuré sur les 80 segments d'évaluation avec ``bge-m3``
-(14 septembre 2026) : 53 termes attendus sur 53 retrouvés, deux déclenchements
-en plus dont un que le début de mot **ne peut pas** trouver — ``slutpunkt``
-dans ``testslutpunkten``, où le terme n'est pas en tête du mot composé.
-
-Le suédois compose : ``testslutpunkten``, ``hastighetsgränsen``. Un préfixe ne
-voit que les composés dont le terme est le premier morceau. Un vecteur les voit
-tous — au prix d'un encodeur, et d'un seuil à étalonner.
+Pourquoi pas une comparaison de chaînes : le suédois agglutine.
+``testslutpunkten``, c'est ``test`` + ``slutpunkt`` + le suffixe défini ``-en``.
+Le terme est enfoui au milieu du mot, et un vecteur l'y retrouve.
 
 **Le seuil appartient à l'encodeur, pas à la tâche.** ``bge-m3`` sépare bien
 vers 0,75 ; l'encodeur factice des tests, qui hache des trigrammes, sépare vers
-0,55. Le même code, deux réglages.
+0,55. ``SEUILS`` associe donc un seuil à chaque encodeur, et un ``seuil=``
+explicite l'emporte toujours. C'est ce qui évite qu'un appel sans argument
+tombe silencieusement sur le mauvais réglage.
+
+Vous écrivez cette recherche au TP 2. Celle d'ici sert aux TP 3, 4 et 6.
 """
 
 from __future__ import annotations
@@ -32,21 +27,17 @@ from commun.prompts import construire_messages
 _MOTS = re.compile(r"[\wåäöÅÄÖ]+")
 
 SEUIL_GLOSSAIRE = 0.75
+SEUILS = {"factice:trigrammes": 0.55}
 
 
 def mots_de(segment_src: str) -> list[str]:
-    """Les mots du segment, en minuscules, sans ponctuation ni chiffres isolés."""
+    """Les mots du segment, en minuscules, sans ponctuation."""
     return [m.lower() for m in _MOTS.findall(segment_src)]
 
 
-def glossaire_pertinent(segment_src: str, glossaire: list[dict]) -> list[dict]:
-    """Les entrées de glossaire qui concernent ce segment, par début de mot.
-
-    Comparaison par **début de mot** : le suédois compose et fléchit
-    (``förfrågan``, ``förfrågningar``), une égalité stricte ne trouverait rien.
-    """
-    mots = mots_de(segment_src)
-    return [t for t in glossaire if any(mot.startswith(t["sv"].lower()) for mot in mots)]
+def seuil_pour(encodeur) -> float:
+    """Le seuil étalonné pour cet encodeur, 0,75 par défaut."""
+    return SEUILS.get(encodeur.nom(), SEUIL_GLOSSAIRE)
 
 
 class GlossaireVectoriel:
@@ -61,10 +52,10 @@ class GlossaireVectoriel:
     """
 
     def __init__(self, glossaire: list[dict], encodeur=None,
-                 seuil: float = SEUIL_GLOSSAIRE):
+                 seuil: float | None = None):
         self.glossaire = glossaire
         self.encodeur = encodeur or obtenir_encodeur()
-        self.seuil = seuil
+        self.seuil = seuil_pour(self.encodeur) if seuil is None else seuil
         self.vecteurs = self.encodeur.encoder([t["sv"] for t in glossaire])
         self._cache: dict[str, list[float]] = {}
         self.encodes = 0

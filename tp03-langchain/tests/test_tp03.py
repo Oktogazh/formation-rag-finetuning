@@ -3,6 +3,7 @@
 import pytest
 
 from commun import corpus
+from commun.augmenter import GlossaireVectoriel
 from commun.recherche import rechercher_lexical
 from commun.verification import Anomalie, verifier
 
@@ -21,27 +22,34 @@ def glossaire():
 
 
 @pytest.fixture(scope="module")
+def index_glossaire(glossaire):
+    """L'encodeur factice du conftest, avec le seuil qui lui correspond."""
+    return GlossaireVectoriel(glossaire)
+
+
+@pytest.fixture(scope="module")
 def chercher():
     memoire = corpus.charger_memoire_brute()
     return lambda src: rechercher_lexical(src, memoire, 2)
 
 
 @pytest.mark.code
-def test_code1_la_chaine_traduit(exercice, glossaire, chercher):
+def test_code1_la_chaine_traduit(exercice, index_glossaire, chercher):
     modele = FakeListChatModel(responses=[JUSTE])
-    chaine = exercice.construire_chaine(chercher, glossaire, modele, "Vouvoyez.")
+    chaine = exercice.construire_chaine(chercher, index_glossaire, modele, "Vouvoyez.")
     assert chaine.invoke(SEGMENT) == JUSTE
 
 
 @pytest.mark.code
-def test_code1_les_voisins_et_le_glossaire_arrivent_au_modele(exercice, glossaire, chercher):
+def test_code1_les_voisins_et_le_glossaire_arrivent_au_modele(exercice, index_glossaire,
+                                                            chercher):
     vus = {}
 
     def espion(entree):
         vus["entree"] = entree
         return AIMessage(content=JUSTE)
 
-    exercice.construire_chaine(chercher, glossaire, RunnableLambda(espion),
+    exercice.construire_chaine(chercher, index_glossaire, RunnableLambda(espion),
                                "Vouvoyez.").invoke(SEGMENT)
     texte = str(vus["entree"])
     assert "Memoire de traduction" in texte, "les voisins doivent arriver jusqu'au modèle"

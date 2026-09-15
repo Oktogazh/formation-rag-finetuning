@@ -163,18 +163,9 @@ print(f"\n  à traduire : {segments[0]['src']}")
 # 400, et les coller toutes dans chaque prompt, c'est le mur du TP 1. On ne
 # garde donc que les entrées qui concernent **ce** segment.
 #
-# La façon évidente est de comparer les chaînes : garder les termes qui sont le
-# **début** d'un mot du segment. Ça marche, c'est en trois lignes, et c'est ce
-# que fait `commun/augmenter.py` pour les TP 3, 4 et 6.
-#
-# **Mais le suédois compose.** `testslutpunkten` contient `slutpunkt` sans
-# commencer par lui : un préfixe ne voit que les composés dont le terme est le
-# premier morceau. C'est une limite de forme, pas de réglage — aucun seuil ne
-# la lève.
-#
-# On cherche donc les termes comme on cherche les voisins : **avec des
-# vecteurs**. Un mot du segment et un terme du glossaire deviennent deux points,
-# et on regarde s'ils sont proches.
+# On cherche les termes comme on cherche les voisins : **avec des vecteurs**.
+# Un mot du segment et un terme du glossaire deviennent deux points, et on
+# regarde s'ils sont proches.
 #
 # `GlossaireVectoriel` encode les 7 termes une fois à la construction, et garde
 # en cache le vecteur de chaque mot déjà vu. Il vous donne :
@@ -428,15 +419,14 @@ atelier.comparer(("RAG lexical k=3", rag_lexical), ("RAG dense k=3", rag_dense))
 #
 # ---
 #
-# ## ARB 2 · Et le glossaire, fallait-il des vecteurs ?
+# ## ARB 2 · Chercher le glossaire, à quel prix ?
 #
-# Vous venez d'écrire deux filtres de glossaire : un début de mot en trois
-# lignes, et une recherche vectorielle qui demande un encodeur, un cache et un
-# seuil. Sur les 80 segments, l'écart tient en **un** mot composé.
+# La recherche du glossaire vous a coûté un encodeur, un cache et un seuil à
+# étalonner — et ce seuil change avec l'encodeur. Tout cela pour 7 termes.
 #
-# **Deux phrases :** ce gain vaut-il cette dépendance pour Helios ? Et votre
-# réponse changerait-elle pour un client dont le glossaire fait 400 entrées et
-# dont la langue compose autant que le suédois — l'allemand, le finnois ?
+# **Deux phrases :** ce dispositif se justifie-t-il pour Helios ? Et votre
+# réponse changerait-elle pour un client dont le glossaire fait 400 entrées,
+# dans une langue qui agglutine autant que le suédois — l'allemand, le finnois ?
 #
 # La bonne réponse n'est pas la même dans les deux cas, et c'est tout l'intérêt
 # de la question.
@@ -444,3 +434,107 @@ atelier.comparer(("RAG lexical k=3", rag_lexical), ("RAG dense k=3", rag_dense))
 # > *Votre réponse :*
 # >
 # >
+
+#
+# ---
+#
+# ## Pour aller plus loin, s'il reste du temps
+#
+# ### D'où sort une mémoire de traduction ?
+#
+# Tout ce TP a cherché dans une mémoire de traduction, et c'était confortable :
+# une mémoire est **déjà découpée, déjà alignée, déjà propre**. C'est un cas
+# rare. La plupart des pipelines RAG cherchent dans une **base documentaire** —
+# des pages, des PDF, des tickets, du texte continu qu'il faut découper soi-même
+# avant de pouvoir l'encoder.
+#
+# Ce découpage s'appelle le **chunking**, et c'est le réglage qui décide de la
+# qualité du RAG avant même le choix de l'encodeur :
+#
+# - **chunks trop gros** : la réponse est dedans, noyée dans dix phrases sans
+#   rapport. Le vecteur moyenne le tout et ne ressemble plus à la question.
+# - **chunks trop petits** : précis, mais amputés de leur contexte. « Elle est
+#   fixée à 60 » ne dit pas de quoi on parle.
+# - **sans recouvrement** : une réponse à cheval sur deux chunks n'est complète
+#   dans aucun des deux.
+#
+# Le corpus contient une page de documentation Helios **dans les deux langues**.
+# On va la découper, aligner les deux découpages, et regarder ce qu'on obtient.
+
+# %%
+import re
+
+pages = corpus.charger_documentation()
+print(f"  sv · {pages['sv']['titre']}")
+print(f"  fr · {pages['fr']['titre']}\n")
+print(pages["sv"]["corps"][:180], "…")
+
+
+def phrases_de(chunk: str) -> list[str]:
+    """Découpe un chunk en phrases. Fourni — volontairement naïf."""
+    return [p.strip() for p in re.split(r"(?<=[.!?]) +", chunk) if p.strip()]
+
+
+def decouper_en_chunks(texte: str) -> list[str]:
+    """Les paragraphes du document, prêts à être encodés."""
+    # <<<BONUS 2 ★ Découper un document en chunks
+    #> Rendez la liste des paragraphes : les blocs séparés par une ligne vide,
+    #> dont on normalise les espaces (" ".join(bloc.split())), en jetant les
+    #> blocs vides et les titres — ceux qui commencent par "#".
+    #> Test : python tp.py test tp02 --bonus -k bonus2
+    chunks = []
+    for bloc in texte.split("\n\n"):
+        bloc = " ".join(bloc.split())
+        if bloc and not bloc.startswith("#"):
+            chunks.append(bloc)
+    return chunks
+    # >>>BONUS 2
+
+
+chunks_sv = decouper_en_chunks(pages["sv"]["corps"])
+chunks_fr = decouper_en_chunks(pages["fr"]["corps"])
+print(f"\n  {len(chunks_sv)} chunks en suédois, {len(chunks_fr)} en français")
+print(f"  taille moyenne : {sum(map(len, chunks_sv)) // len(chunks_sv)} caractères")
+
+# %% [markdown]
+# ### OBS 4 · Le document devient une mémoire
+#
+# Les deux versions se découpent en **autant de chunks**, dans le même ordre :
+# c'est ce qui permet de les apparier. On descend ensuite d'un cran, du
+# paragraphe à la phrase, et l'appariement donne des lignes `src` / `tgt`.
+#
+# Comparez-les aux entrées de `tm.jsonl` affichées dessous : **c'est la même
+# chose.** Une mémoire de traduction est une base documentaire bilingue qu'on a
+# découpée à la phrase et alignée. Le TP n'a jamais fait autre chose que du RAG
+# sur une base documentaire — elle était simplement pré-découpée.
+#
+# Retenez la dernière ligne : **le chunk et le segment n'ont pas la même
+# taille**. Chercher dans l'un ou dans l'autre ne rend pas le même contexte, et
+# c'est le premier arbitrage d'un vrai pipeline.
+
+# %%
+segments_produits = []
+for chunk_sv, chunk_fr in zip(chunks_sv, chunks_fr):
+    phrases_sv, phrases_fr = phrases_de(chunk_sv), phrases_de(chunk_fr)
+    if len(phrases_sv) != len(phrases_fr):
+        print(f"  ⚠ chunk désaligné : {len(phrases_sv)} phrases sv / {len(phrases_fr)} fr")
+        continue
+    for source, cible in zip(phrases_sv, phrases_fr):
+        segments_produits.append({"src": source, "tgt": cible})
+
+print(f"  {len(chunks_sv)} chunks  ->  {len(segments_produits)} segments alignés\n")
+for segment in segments_produits[:3]:
+    print(f"    sv  {segment['src']}")
+    print(f"    fr  {segment['tgt']}\n")
+
+print("  Les mêmes lignes, prises dans tm.jsonl :\n")
+for segment in memoire[:2]:
+    print(f"    sv  {segment['src']}")
+    print(f"    fr  {segment['tgt']}\n")
+
+taille_chunk = sum(map(len, chunks_sv)) // len(chunks_sv)
+taille_segment = sum(len(s["src"]) for s in segments_produits) // len(segments_produits)
+taille_memoire = sum(len(s["src"]) for s in memoire) // len(memoire)
+print(f"  chunk (paragraphe)     : {taille_chunk} caractères")
+print(f"  segment (phrase)       : {taille_segment} caractères")
+print(f"  segment de tm.jsonl    : {taille_memoire} caractères")

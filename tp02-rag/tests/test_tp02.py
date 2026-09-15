@@ -74,7 +74,31 @@ def test_code4_le_prompt_augmente_contient_voisins_et_glossaire(exercice, memoir
     assert "vous" in messages[0]["content"].lower(), "la consigne de style doit être là"
 
 
+@pytest.mark.bonus
+@pytest.mark.code
+def test_bonus2_le_document_se_decoupe_en_paragraphes(exercice):
+    """Les titres et les lignes vides ne sont pas des chunks."""
+    pages = corpus.charger_documentation()
+    chunks = exercice.decouper_en_chunks(pages["sv"]["corps"])
+    assert len(chunks) == 6, "six paragraphes, titres exclus"
+    assert all(not c.startswith("#") for c in chunks), "un titre n'est pas un chunk"
+    assert all(c == c.strip() and "\n" not in c for c in chunks), "espaces normalisés"
+    assert chunks[0].startswith("Hastighetsgränsen är satt till 60")
+    # le français se découpe en autant de chunks : c'est ce qui permet d'aligner
+    assert len(exercice.decouper_en_chunks(pages["fr"]["corps"])) == len(chunks)
+
+
 # --- socle ------------------------------------------------------------------
+def test_la_documentation_est_alignee_dans_les_deux_langues():
+    """Le materiau du bonus : deux versions decoupables a l'identique."""
+    pages = corpus.charger_documentation()
+    assert set(pages) == {"sv", "fr"}
+    for langue in ("sv", "fr"):
+        assert pages[langue]["corps"].count("\n\n") >= 6
+        assert not pages[langue]["corps"].startswith("---"), "en-tete YAML retire"
+
+
+
 def test_le_cache_du_glossaire_evite_de_reencoder(index_glossaire):
     """Deux fois le même segment ne coûte qu'un encodage de ses mots."""
     phrase = "Du kan skapa upp till 5 integrationer per abonnemang."

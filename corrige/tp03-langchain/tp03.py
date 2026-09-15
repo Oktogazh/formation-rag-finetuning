@@ -50,7 +50,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
 
 from commun import atelier, corpus
-from commun.augmenter import construire, glossaire_pertinent
+from commun.augmenter import GlossaireVectoriel, construire
 from commun.consignes import CONSIGNE_STYLE
 from commun.memoire import charger_memoire
 from commun.recherche import chercheur
@@ -78,6 +78,7 @@ def modele_langchain(temperature: float = 0.0, max_tokens: int = 256):
 
 memoire = charger_memoire()
 glossaire = corpus.charger_glossaire()
+index_glossaire = GlossaireVectoriel(glossaire)
 segments = atelier.segments(n=20)
 chercher = chercheur(memoire, "dense", k=3)
 modele = modele_langchain()
@@ -115,8 +116,8 @@ for cle, valeur in demo.invoke("Fakturan skickas varje vecka.").items():
 # étapes :
 #
 # 1. un `RunnableParallel` qui prépare trois valeurs à partir du segment : les
-#    voisins (`chercher`), le glossaire filtré (`glossaire_pertinent`), et le
-#    segment lui-même ;
+#    voisins (`chercher`), les termes du glossaire (`index_glossaire.chercher`),
+#    et le segment lui-même ;
 # 2. un `RunnableLambda` qui appelle `construire(...)` et rend la liste de
 #    messages ;
 # 3. le modèle ;
@@ -130,28 +131,28 @@ for cle, valeur in demo.invoke("Fakturan skickas varje vecka.").items():
 # exactement la forme attendue.
 
 # %%
-def construire_chaine(chercher, glossaire, modele, consignes=CONSIGNE_STYLE):
+def construire_chaine(chercher, index_glossaire, modele, consignes=CONSIGNE_STYLE):
     """La chaîne du cran 3 : recherche, prompt, modèle, texte."""
     en_messages = RunnableLambda(
         lambda d: construire(d["segment"], d["voisins"], d["glossaire"], consignes))
     # <<<CODE 1 ★★ Assembler la chaîne LCEL
     #> Construisez un RunnableParallel avec exactement ces trois clés :
     #>     "voisins"   -> RunnableLambda(chercher)
-    #>     "glossaire" -> RunnableLambda(lambda src: glossaire_pertinent(src, glossaire))
+    #>     "glossaire" -> RunnableLambda(index_glossaire.chercher)
     #>     "segment"   -> RunnablePassthrough()
     #> puis composez avec l'opérateur | : preparation | en_messages | modele
     #> | StrOutputParser(), et rendez le tout.
     #> Test : python tp.py test tp03 -k code1
     preparation = RunnableParallel({
         "voisins": RunnableLambda(chercher),
-        "glossaire": RunnableLambda(lambda src: glossaire_pertinent(src, glossaire)),
+        "glossaire": RunnableLambda(index_glossaire.chercher),
         "segment": RunnablePassthrough(),
     })
     return preparation | en_messages | modele | StrOutputParser()
     # >>>CODE 1
 
 
-chaine = construire_chaine(chercher, glossaire, modele)
+chaine = construire_chaine(chercher, index_glossaire, modele)
 print(chaine.invoke(segments[0]["src"]))
 
 # %% [markdown]
@@ -225,7 +226,7 @@ def traduire_et_corriger(segment: dict) -> Sortie:
     while anomalies and appels < MAX_TENTATIVES:
         remarques = "\n".join(f"- {a}" for a in anomalies)
         messages = construire(segment["src"], chercher(segment["src"]),
-                              glossaire_pertinent(segment["src"], glossaire), CONSIGNE_STYLE)
+                              index_glossaire.chercher(segment["src"]), CONSIGNE_STYLE)
         messages += [
             {"role": "assistant", "content": traduction},
             {"role": "user", "content": f"Le contrôle a relevé :\n{remarques}\n"

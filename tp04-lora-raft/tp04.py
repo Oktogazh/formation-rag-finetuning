@@ -63,7 +63,7 @@ sys.path.insert(0, str(RACINE))
 os.chdir(RACINE)
 
 from commun import atelier, corpus
-from commun.augmenter import glossaire_pertinent
+from commun.augmenter import GlossaireVectoriel
 from commun.consignes import CONSIGNE_STYLE
 from commun.memoire import charger_memoire
 from commun.petit_modele import DOSSIER_ADAPTATEUR, MoteurPetit, entrainer_lora
@@ -73,6 +73,7 @@ from commun.recherche import rechercher_lexical, similarite
 GRAINE = 13
 memoire = charger_memoire()
 glossaire = corpus.charger_glossaire()
+index_glossaire = GlossaireVectoriel(glossaire)
 segments = atelier.segments(n=20)
 
 base = MoteurPetit()
@@ -93,7 +94,7 @@ print(f"Modèle : {base.nom()} · {len(memoire)} segments de mémoire")
 for segment in segments[:3]:
     messages = construire_messages(
         segment["src"], voisins=rechercher_lexical(segment["src"], memoire, 3),
-        glossaire=glossaire_pertinent(segment["src"], glossaire), consignes=CONSIGNE_STYLE)
+        glossaire=index_glossaire.chercher(segment["src"]), consignes=CONSIGNE_STYLE)
     print(f"  sv   {segment['src']}")
     print(f"  réf  {segment['tgt']}")
     print(f"  brut {base.generer(messages).texte.strip()[:110]!r}\n")
@@ -148,13 +149,13 @@ print(f"  entraînement {len(entrainement)} · validation {len(validation)} · "
 # doit être **exactement** celui de l'inférence — `construire_messages`.
 
 # %%
-def exemple_raft(segment: dict, memoire: list[dict], glossaire: list[dict], k: int = 3,
+def exemple_raft(segment: dict, memoire: list[dict], index_glossaire, k: int = 3,
                  p_oracle: float = 0.8, rng: random.Random | None = None) -> dict:
     """Un exemple d'entraînement, au format {"messages": [...]}."""
     rng = rng or random.Random(GRAINE)
     autres = [s for s in memoire if s["id"] != segment["id"]]
     proches = rechercher_lexical(segment["src"], autres, k=10)
-    termes = glossaire_pertinent(segment["src"], glossaire)
+    termes = index_glossaire.chercher(segment["src"])
     # <<<CODE 1 ★★★ Oracle ou distracteurs
     # 1. Si rng.random() < p_oracle : voisins = les k premiers de « proches ».
     # Sinon : voisins = rng.sample(<les segments de « autres » dont l'id
@@ -171,7 +172,7 @@ def exemple_raft(segment: dict, memoire: list[dict], glossaire: list[dict], k: i
     # >>>CODE 1
 
 
-apercu = exemple_raft(entrainement[0], memoire, glossaire, rng=random.Random(1))
+apercu = exemple_raft(entrainement[0], memoire, index_glossaire, rng=random.Random(1))
 atelier.montrer_prompt(apercu["messages"])
 
 # %% [markdown]
@@ -191,7 +192,7 @@ P_ORACLE = 0.8
 K_VOISINS = 3
 
 rng = random.Random(GRAINE)
-jeu = [exemple_raft(s, memoire, glossaire, K_VOISINS, P_ORACLE, rng)
+jeu = [exemple_raft(s, memoire, index_glossaire, K_VOISINS, P_ORACLE, rng)
        for s in entrainement]
 longueurs = [sum(len(m["content"]) for m in e["messages"]) for e in jeu]
 print(f"  {len(jeu)} exemples · {sum(longueurs) / len(longueurs):.0f} caractères en moyenne")
@@ -328,7 +329,7 @@ adapte = MoteurPetit(adaptateur=DOSSIER_ADAPTATEUR)
 def prompt_complet(src: str):
     return construire_messages(
         src, voisins=rechercher_lexical(src, memoire, 3),
-        glossaire=glossaire_pertinent(src, glossaire), consignes=CONSIGNE_STYLE)
+        glossaire=index_glossaire.chercher(src), consignes=CONSIGNE_STYLE)
 
 
 for segment in segments[:3]:
@@ -371,7 +372,7 @@ atelier.par_categorie(("avant", mesure_base), ("après", mesure_adapte))
 # vu.
 
 # %%
-def exemple_sans_contexte(segment: dict, glossaire: list[dict]) -> dict:
+def exemple_sans_contexte(segment: dict, index_glossaire) -> dict:
     """BONUS — un exemple d'entraînement sans aucun voisin."""
     # <<<BONUS 4 ★ Exemple sans contexte
     # Même forme que exemple_raft, mais avec une liste de voisins vide.

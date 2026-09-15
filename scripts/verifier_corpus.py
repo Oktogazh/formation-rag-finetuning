@@ -85,6 +85,19 @@ def controler() -> list[str]:
     if len(documents) != 6:
         fautes.append(f"{len(documents)} documents au lieu de 6")
 
+    # La page bilingue du bonus du TP 2 : les deux versions doivent se decouper
+    # en autant de paragraphes, sinon l'alignement du bonus ne tombe pas juste.
+    pages = {}
+    for chemin in sorted((CORPUS / "documentation").glob("*.md")):
+        corps = chemin.read_text(encoding="utf-8").split("---", 2)[-1]
+        pages[chemin.name] = [b for b in corps.split("\n\n")
+                              if b.strip() and not b.strip().startswith("#")]
+    if len(pages) != 2:
+        fautes.append(f"{len(pages)} pages de documentation au lieu de 2 (sv et fr)")
+    elif len(set(map(len, pages.values()))) != 1:
+        tailles = {n: len(p) for n, p in pages.items()}
+        fautes.append(f"documentation desalignee : {tailles}")
+
     return fautes
 
 

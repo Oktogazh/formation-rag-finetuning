@@ -29,9 +29,15 @@ jupyter lab
 
 ```bash
 pip install torch peft
+ollama pull bge-m3
 ```
 
 Environ 250 Mo, aucun GPU. Le modèle se télécharge au premier usage (270 Mo).
+
+`bge-m3` (1,2 Go) sert à chercher les termes du glossaire, comme au TP 2 : les
+exemples d'entraînement portent le même glossaire filtré que l'inférence, et
+c'est la condition pour que le fine-tuning serve à quelque chose. Si vous avez
+déjà fait le TP 2, il est déjà là.
 
 ## Les exercices
 

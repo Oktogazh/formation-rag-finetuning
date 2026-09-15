@@ -5,6 +5,7 @@ import random
 import pytest
 
 from commun import corpus
+from commun.augmenter import GlossaireVectoriel
 from commun.recherche import rechercher_lexical
 
 
@@ -13,10 +14,16 @@ def memoire():
     return corpus.charger_memoire_brute()
 
 
+@pytest.fixture(scope="module")
+def index_glossaire():
+    """L'encodeur factice du conftest, avec le seuil qui lui correspond."""
+    return GlossaireVectoriel(corpus.charger_glossaire())
+
+
 @pytest.mark.code
-def test_code1_l_exemple_raft_a_la_bonne_forme(exercice, memoire):
+def test_code1_l_exemple_raft_a_la_bonne_forme(exercice, memoire, index_glossaire):
     segment = memoire[5]
-    exemple = exercice.exemple_raft(segment, memoire, corpus.charger_glossaire(),
+    exemple = exercice.exemple_raft(segment, memoire, index_glossaire,
                                     k=3, p_oracle=1.0, rng=random.Random(1))
     messages = exemple["messages"]
     assert [m["role"] for m in messages] == ["system", "user", "assistant"]
@@ -28,11 +35,12 @@ def test_code1_l_exemple_raft_a_la_bonne_forme(exercice, memoire):
 
 
 @pytest.mark.code
-def test_code1_les_distracteurs_ne_sont_pas_les_vrais_voisins(exercice, memoire):
+def test_code1_les_distracteurs_ne_sont_pas_les_vrais_voisins(exercice, memoire,
+                                                              index_glossaire):
     segment = memoire[5]
     autres = [s for s in memoire if s["id"] != segment["id"]]
     proches = {s["id"] for s in rechercher_lexical(segment["src"], autres, k=10)}
-    contexte = exercice.exemple_raft(segment, memoire, corpus.charger_glossaire(), k=3,
+    contexte = exercice.exemple_raft(segment, memoire, index_glossaire, k=3,
                                      p_oracle=0.0, rng=random.Random(7))["messages"][1]["content"]
     injectes = {s["id"] for s in autres if s["src"] in contexte}
     assert injectes, "il doit y avoir des voisins, même faux"
@@ -51,8 +59,9 @@ def test_code2_la_configuration_lora_est_coherente(exercice):
 
 @pytest.mark.bonus
 @pytest.mark.code
-def test_bonus4_l_exemple_sans_contexte_n_a_pas_de_memoire(exercice, memoire):
-    exemple = exercice.exemple_sans_contexte(memoire[2], corpus.charger_glossaire())
+def test_bonus4_l_exemple_sans_contexte_n_a_pas_de_memoire(exercice, memoire,
+                                                           index_glossaire):
+    exemple = exercice.exemple_sans_contexte(memoire[2], index_glossaire)
     contexte = exemple["messages"][1]["content"]
     assert "Memoire de traduction" not in contexte
     assert exemple["messages"][-1]["content"] == memoire[2]["tgt"]

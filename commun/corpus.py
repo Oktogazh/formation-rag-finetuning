@@ -39,6 +39,7 @@ from pathlib import Path
 from commun import RACINE
 
 CORPUS = RACINE / "data" / "corpus" / "helios-sv"
+DOCUMENTATION = CORPUS / "documentation"
 
 
 def lire_jsonl(chemin: str | Path) -> list[dict]:
@@ -128,6 +129,28 @@ def charger_docs() -> list[dict]:
                     entete[cle.strip()] = valeur.strip()
         docs.append({**entete, "fichier": chemin.name, "corps": corps.strip()})
     return docs
+
+
+def charger_documentation() -> dict[str, dict]:
+    """La meme page de documentation Helios dans les deux langues.
+
+    Rend ``{"sv": {...}, "fr": {...}}``, chaque entree portant ``titre`` et
+    ``corps`` (l'en-tete YAML est retire). C'est le materiau du bonus du TP 2 :
+    une base documentaire, et non une memoire de traduction. Un pipeline RAG
+    sert le plus souvent a chercher dans la premiere.
+    """
+    pages = {}
+    for chemin in sorted(DOCUMENTATION.glob("*.md")):
+        texte = chemin.read_text(encoding="utf-8")
+        entete, corps = {}, texte
+        if texte.startswith("---"):
+            _, brut, corps = texte.split("---", 2)
+            for ligne in brut.strip().splitlines():
+                if ":" in ligne:
+                    cle, valeur = ligne.split(":", 1)
+                    entete[cle.strip()] = valeur.strip()
+        pages[entete.get("langue", chemin.stem)] = {**entete, "corps": corps.strip()}
+    return pages
 
 
 def texte_des_consignes() -> str:

@@ -19,7 +19,16 @@
     "fuzzy": 18,
     "nouveau": 21
   },
-  "revision": "2026-09-13",
+  "revision": "2026-09-15",
   "verification": "python scripts/verifier_corpus.py",
-  "note": "Corpus entierement fictif, produit pour la formation. Aucun document reel d'entreprise."
+  "note": "Corpus entierement fictif, produit pour la formation. Aucun document reel d'entreprise.",
+  "documentation": {
+    "dossier": "documentation",
+    "pages": 1,
+    "langues": [
+      "sv",
+      "fr"
+    ],
+    "note": "Une page Helios dans les deux langues, alignee paragraphe par paragraphe. Materiau du bonus de chunking du TP 2. Hors du 'mur' du TP 1, qui ne lit que docs/."
+  }
 }
