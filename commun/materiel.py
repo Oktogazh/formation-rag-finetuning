@@ -160,6 +160,8 @@ def conseils(etat: dict | None = None) -> list[str]:
             "pip install torch peft                 # TP 4 seulement, ~250 Mo.\n"
             "    Aucun GPU n'est nécessaire : le TP 4 entraîne un petit modèle sur\n"
             "    le processeur, et cela prend quelques minutes.")
+    # Pas de LangSmith ici : ce n'est pas un prerequis, c'est un reglage du
+    # premier exercice du TP 3 (RÉG 0), fait dans le notebook lui-meme.
     if etat["accelerateur"] == "cpu" and not etat["cle_mistral"]:
         a_faire.append(
             "Votre machine n'a pas d'accélérateur. Tout fonctionne, mais comptez\n"

@@ -94,7 +94,8 @@ def cmd_check(args) -> int:
           "TP 1 chapitre 0, et TP 4")
     ligne("peft", etat["peft"], "TP 4 seulement")
     ligne("Clé API Mistral", etat["cle_mistral"], "repli si la machine ne suit pas")
-    ligne("Clé LangSmith", etat["cle_langsmith"], "TP 3, 5 et 6, facultatif")
+    ligne("Clé LangSmith (optionnel)", etat["cle_langsmith"],
+          "TP 3 — se règle dans le notebook, pas ici")
 
     titre("Ce qui sera utilisé")
     print(f"  Moteur             {etat['moteur_retenu']}")

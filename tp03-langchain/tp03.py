@@ -22,19 +22,62 @@
 # - la même interface pour Ollama, Mistral ou autre chose. Vous avez déjà cette
 #   abstraction dans `commun/moteur.py`, écrite à la main en quarante lignes :
 #   comparez, c'est instructif dans les deux sens ;
-# - **le traçage gratuit** : une variable d'environnement, et chaque étape
-#   devient visible dans LangSmith sans une ligne de code en plus.
+# - **le traçage gratuit** : une variable réglée en haut du notebook, et chaque
+#   étape devient visible dans LangSmith sans une ligne de code en plus. C'est
+#   le RÉG 0 juste en dessous, et c'est le meilleur argument du lot.
 #
 # Ce qu'elle coûte : une dépendance de plus, des abstractions à apprendre, et
 # une pile d'appels difficile à lire quand ça casse.
 
 # %% [markdown]
-# ## Préparation
+# ## RÉG 0 · Régler votre clé LangSmith — **à faire maintenant, avant tout le reste**
 #
-# `modele_langchain()` choisit le modèle selon la même règle que
-# `commun/moteur.py` : l'API Mistral si vous avez une clé, Ollama sinon. Le
-# reste de la chaîne ne voit pas la différence, et c'est exactement ce qu'on
-# attend d'une couche d'orchestration.
+# Ce TP est le premier où la chaîne fait plusieurs choses à la suite. Quand elle
+# rendra une mauvaise traduction, la question sera : *lequel des quatre maillons
+# a fauté ?* Un `print` ne vous le dira pas. **LangSmith** enregistre chaque
+# étape — le prompt exact envoyé, les voisins injectés, la réponse brute, la
+# durée, les tokens — et vous les montre en arbre.
+#
+# Et la démonstration du jour tient en une phrase : **vous n'écrirez aucune
+# ligne de code pour tracer la chaîne.** Une clé réglée une fois, et LangChain
+# trace tout seul. C'est le principal argument commercial d'une couche
+# d'orchestration, et il vaut la peine d'être vu une fois.
+#
+# **Créez votre compte et votre jeton — ≈ 3 minutes :**
+#
+# 1. <https://smith.langchain.com> → **Sign up** (Google, GitHub ou e-mail). Le
+#    palier gratuit *Developer* suffit : 5 000 traces par mois, aucune carte
+#    bancaire ;
+# 2. ⚠️ l'inscription demande une **région, `US` ou `EU`**, **définitive** pour
+#    l'organisation. Prenez **`EU`** si vous hésitez — vos traces contiennent
+#    la documentation du client ;
+# 3. votre avatar en bas à gauche → **Settings** → **API Keys** → **Create API
+#    Key**, type **Personal Access Token**. La clé commence par `lsv2_pt_` et
+#    **n'est affichée qu'une fois** : copiez-la tout de suite.
+#
+# **Réglez-la ci-dessous**, comme on règle n'importe quel paramètre du TP.
+# Rien d'autre à ouvrir, rien d'autre à éditer : le notebook n'est **jamais
+# versionné** (`*.ipynb` dans `.gitignore` — `python tp.py notebooks` le
+# refabrique à chaque fois depuis `tp03.py`), donc coller une clé ici ne finit
+# ni dans un commit ni dans une pull request.
+#
+# Mettez **votre prénom** dans `LANGSMITH_PROJECT` : à quinze dans le même
+# projet, vos traces se mélangent et l'exercice OBS 2 ne veut plus rien dire.
+
+# %%
+LANGSMITH_API_KEY = ""                      # <- collez votre clé lsv2_pt_… ici
+LANGSMITH_PROJECT = "formation-helios-prenom"  # <- et votre prénom ici
+
+# %% [markdown]
+# La cellule ci-dessous branche le traçage avec ces deux réglages. **À exécuter
+# avant la première traduction** : LangChain décide de tracer au moment de
+# l'appel, mais son client se met en cache dès le premier envoi — régler la
+# clé trop tard, c'est perdre les premières cellules.
+#
+# Le message qui s'affiche dit exactement ce qui s'est passé. Pas de clé ?
+# **Le TP fonctionne quand même** — vous sautez l'exercice OBS 2, rien de plus.
+# Clé refusée par les deux serveurs (US et EU) ? Un copier-coller a laissé un
+# espace ou une fin de ligne — c'est l'erreur la plus fréquente.
 
 # %%
 import os
@@ -46,6 +89,19 @@ RACINE = next(p for p in [pathlib.Path.cwd(), *pathlib.Path.cwd().parents]
 sys.path.insert(0, str(RACINE))
 os.chdir(RACINE)
 
+from commun import tracage
+
+etat = tracage.activer(cle=LANGSMITH_API_KEY, projet=LANGSMITH_PROJECT)
+
+# %% [markdown]
+# ## Préparation
+#
+# `modele_langchain()` choisit le modèle selon la même règle que
+# `commun/moteur.py` : l'API Mistral si vous avez une clé, Ollama sinon. Le
+# reste de la chaîne ne voit pas la différence, et c'est exactement ce qu'on
+# attend d'une couche d'orchestration.
+
+# %%
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
 
@@ -150,7 +206,14 @@ def construire_chaine(chercher, index_glossaire, modele, consignes=CONSIGNE_STYL
     # >>>CODE 1
 
 
-chaine = construire_chaine(chercher, index_glossaire, modele)
+# `with_config` ne change rien à ce que la chaîne calcule : il lui donne un nom
+# et des étiquettes. Sans ça, LangSmith affiche « RunnableSequence » trois fois
+# et vous ne savez plus laquelle des trois variantes vous regardez.
+chaine = construire_chaine(chercher, index_glossaire, modele).with_config(
+    run_name="helios-chaine-seule",
+    tags=["tp03", "cran3", "chaine-seule"],
+    metadata={"recherche": "dense", "k": 3, "modele": type(modele).__name__},
+)
 print(chaine.invoke(segments[0]["src"]))
 
 # %% [markdown]
@@ -217,6 +280,13 @@ for candidate in ["La formule Bas autorise 20 requêtes par minute.",
 MAX_TENTATIVES = 2
 
 
+# `@traceable` est l'autre moitié du traçage : la chaîne LCEL est instrumentée
+# toute seule, mais cette fonction-ci est du Python ordinaire. Sans décorateur,
+# LangSmith montrerait deux traces sans lien ; avec, il montre **un** arbre —
+# premier appel, contrôle, deuxième appel — et c'est là qu'on lit le coût réel
+# d'une boucle d'agent.
+@tracage.traceable(name="helios-chaine-verifiee", run_type="chain",
+                   tags=["tp03", "cran3", "verification"])
 def traduire_et_corriger(segment: dict) -> Sortie:
     traduction = nettoyer_sortie(chaine.invoke(segment["src"]))
     appels = 1
@@ -261,6 +331,8 @@ from commun.verification import reparer_chiffres
 REPARER_LOCALEMENT = True
 
 
+@tracage.traceable(name="helios-reparation-locale", run_type="chain",
+                   tags=["tp03", "cran3", "reparation-locale"])
 def traduire_et_reparer(segment: dict) -> Sortie:
     traduction = nettoyer_sortie(chaine.invoke(segment["src"]))
     if REPARER_LOCALEMENT:
@@ -278,26 +350,38 @@ atelier.comparer(("chaîne seule", sans_controle), ("+ vérification", avec_cont
 # %% [markdown]
 # ## OBS 2 · Voir la chaîne tourner
 #
-# Le formateur vous donne une clé LangSmith pendant la séance. Dans `.env` :
+# Tout ce qui précède est déjà parti dans LangSmith — vous avez réglé la clé au
+# RÉG 0, et **pas une ligne de code de plus n'a été écrite pour ça**. La cellule
+# ci-dessous ajoute trois traductions bien étiquetées,
+# vide la file d'envoi, compte ce qui est arrivé et vous donne le lien.
 #
-# ```
-# LANGSMITH_TRACING=true
-# LANGSMITH_API_KEY=lsv2_...
-# LANGSMITH_PROJECT=formation-helios-<votre prénom>
-# ```
+# **Ouvrez le projet et répondez, en regardant l'arbre :**
 #
-# Si le compte est européen, ajoutez
-# `LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com`. Sans cette ligne les
-# traces n'arrivent jamais et **rien ne vous le dit** : c'est le piège numéro un.
+# 1. dépliez une trace `helios-chaine-seule`. Combien de nœuds enfants ?
+#    Retrouvez-y le `RunnableParallel`, et vérifiez que ses trois branches —
+#    `voisins`, `glossaire`, `segment` — sont bien **côte à côte et non en
+#    file** : c'est le parallélisme du LIRE 1, rendu visible ;
+# 2. cliquez sur le nœud du modèle. Vous voyez le **prompt exact** envoyé,
+#    voisins compris. Comptez les tokens d'entrée, et comparez-les aux 4 461
+#    tokens du mur du TP 1 ;
+# 3. filtrez sur le tag `verification`. Ouvrez une trace qui a **deux** appels
+#    au modèle : vous lisez la remarque du contrôle, puis la réécriture. C'est
+#    le coût de la boucle, en clair ;
+# 4. comparez la latence médiane des tags `chaine-seule` et `verification`. Le
+#    rapport est-il celui que vous prédisiez à la lecture de la colonne
+#    `Appels` ?
 #
-# Relancez la cellule ci-dessous, ouvrez le projet, et retrouvez : le prompt
-# exact, les voisins injectés, la réponse, la durée, les tokens. **Aucune ligne
-# de code n'a été ajoutée pour ça.** C'est l'outil du TP 5.
+# **Si le compte est vide**, ne cherchez pas au hasard : remontez au RÉG 0,
+# corrigez `LANGSMITH_API_KEY` et relancez sa cellule — elle vous dira lequel
+# des trois problèmes vous avez (pas de clé, clé refusée, traçage coupé).
+#
+# C'est l'outil du TP 5, où il servira à voir un service se faire bombarder.
 
 # %%
-print("Traçage actif :", os.environ.get("LANGSMITH_TRACING", "non"))
 for segment in segments[:3]:
-    print(f"  {chaine.invoke(segment['src'])}")
+    print(f"  {chaine.invoke(segment['src'], config={'tags': ['obs2']})}")
+
+tracage.rapport()
 
 # %% [markdown]
 # ## ARB 1 · Votre arbitrage
