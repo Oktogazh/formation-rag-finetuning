@@ -225,29 +225,34 @@ for terme in glossaire_pertinent(exemple, index_glossaire):
 #
 # Trois choses à relever, dans l'ordre.
 #
-# **1. Le mot composé.** `Testslutpunkten` ne commence pas par `slutpunkt`, donc
-# le début de mot ne trouve rien — et pourtant la traduction de référence dit
-# bien « point de terminaison ». Les vecteurs l'attrapent. C'est le seul cas du
-# corpus : un gain réel, mais mesurez-le avant d'en faire un argument.
+# **1. Le mot agglutiné.** Le suédois compose sans espace ni trait d'union :
+# `Testslutpunkten`, c'est `test` + `slutpunkt` + le suffixe défini `-en`. Le
+# terme du glossaire est enfoui entre un préfixe et un suffixe, et pourtant son
+# vecteur reste proche de celui du mot entier — les scores ci-dessous le
+# montrent.
 #
-# **2. Le suédois et le français ne sont pas au même endroit.** On encode
-# maintenant les deux côtés du glossaire. Les deux colonnes disent la même
-# chose, et pourtant le cosinus n'est pas de 1 : un vecteur encode une chaîne,
-# pas un sens pur. Regardez surtout `abonnemang` → `formule`.
+# **2. Le suédois et le français ne sont pas au même endroit.** On encode ici
+# les deux côtés du glossaire — alors que **la recherche, elle, ne voit que le
+# suédois** : elle compare les mots suédois du segment aux termes suédois du
+# glossaire, jamais à leur traduction. Les deux colonnes disent la même chose,
+# et pourtant le cosinus n'est pas de 1 : un vecteur encode **une chaîne dans
+# une langue**, pas un sens pur.
+#
+# `abonnemang` → `formule` tombe à 0,50, et en partant de « formule » on
+# retombe sur `förfråg`. **Cela ne gêne en rien ce TP** : `abonnemang` est
+# retrouvé dans les 21 segments qui l'attendent, à 0,895. C'est un
+# avertissement pour le jour où vous chercherez *entre* deux langues — la
+# qualité de l'alignement se vérifie terme par terme, elle ne se suppose pas.
 #
 # **3. Le cache.** Les 80 segments font 645 mots, mais beaucoup moins de mots
 # **distincts**. Sans cache, on paierait un encodage par occurrence.
 
 # %%
-# --- 1. le mot composé, que le début de mot ne peut pas voir ---------------
-from commun.augmenter import glossaire_pertinent as par_debut_de_mot
-
+# --- 1. le terme retrouvé à l'intérieur d'un mot agglutiné -----------------
 tous = corpus.charger_evaluation()          # les 80, pas l'échantillon de 20
 compose = next(s for s in tous if "Testslutpunkten" in s["src"])
 print(f"  {compose['src']}")
-print(f"  {compose['tgt']}")
-print(f"    début de mot : {[t['sv'] for t in par_debut_de_mot(compose['src'], glossaire)]}")
-print(f"    vecteurs     : "
+print(f"    scores : "
       f"{[(t['sv'], round(t['score'], 3)) for t in glossaire_pertinent(compose['src'], index_glossaire)]}")
 
 # --- 2. la source et la cible du glossaire, encodées toutes les deux -------
@@ -256,7 +261,8 @@ print(f"\n  {'suédois':<18} {'français':<22} {'cos(sv, fr)':>11}")
 for terme, vecteur_sv, vecteur_fr in zip(glossaire, index_glossaire.vecteurs, vecteurs_fr):
     print(f"  {terme['sv']:<18} {terme['fr']:<22} {cosinus(vecteur_sv, vecteur_fr):>11.3f}")
 
-print("\n  Et si on part du français, retombe-t-on sur son suédois ?")
+print("\n  Hors du chemin de recherche — ce TP cherche sv → sv :")
+print("  en partant du français, retombe-t-on sur son suédois ?")
 for i, terme in enumerate(glossaire):
     classe = sorted(zip((cosinus(vecteurs_fr[i], v) for v in index_glossaire.vecteurs),
                         (t["sv"] for t in glossaire)), reverse=True)

@@ -55,12 +55,9 @@ def test_code3_le_glossaire_est_cherche_par_vecteurs(exercice, index_glossaire):
 
 
 @pytest.mark.code
-def test_code3_le_mot_compose_que_le_prefixe_ne_voit_pas(exercice, index_glossaire):
-    """``testslutpunkten`` contient ``slutpunkt`` sans commencer par lui."""
-    from commun.augmenter import glossaire_pertinent as par_debut_de_mot
-
+def test_code3_retrouve_un_terme_agglutine(exercice, index_glossaire):
+    """``slutpunkt`` est enfoui dans ``testslutpunkten``, entre un prefixe et un suffixe."""
     compose = "Testslutpunkten förbrukar inte din kvot."
-    assert par_debut_de_mot(compose, corpus.charger_glossaire()) == []
     retenus = exercice.glossaire_pertinent(compose, index_glossaire)
     assert "slutpunkt" in {t["sv"] for t in retenus}
 
