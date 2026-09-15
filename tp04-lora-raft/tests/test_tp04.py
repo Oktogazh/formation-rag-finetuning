@@ -20,8 +20,7 @@ def index_glossaire():
     return GlossaireVectoriel(corpus.charger_glossaire())
 
 
-@pytest.mark.code
-def test_code1_l_exemple_raft_a_la_bonne_forme(exercice, memoire, index_glossaire):
+def test_obs2_l_exemple_raft_a_la_bonne_forme(exercice, memoire, index_glossaire):
     segment = memoire[5]
     exemple = exercice.exemple_raft(segment, memoire, index_glossaire,
                                     k=3, p_oracle=1.0, rng=random.Random(1))
@@ -34,8 +33,7 @@ def test_code1_l_exemple_raft_a_la_bonne_forme(exercice, memoire, index_glossair
         "le segment ne doit jamais voir sa propre traduction dans son contexte")
 
 
-@pytest.mark.code
-def test_code1_les_distracteurs_ne_sont_pas_les_vrais_voisins(exercice, memoire,
+def test_obs2_les_distracteurs_ne_sont_pas_les_vrais_voisins(exercice, memoire,
                                                               index_glossaire):
     segment = memoire[5]
     autres = [s for s in memoire if s["id"] != segment["id"]]
@@ -48,7 +46,7 @@ def test_code1_les_distracteurs_ne_sont_pas_les_vrais_voisins(exercice, memoire,
 
 
 @pytest.mark.code
-def test_code2_la_configuration_lora_est_coherente(exercice):
+def test_code1_la_configuration_lora_est_coherente(exercice):
     config = exercice.config_lora(rang=8)
     assert set(config) == {"rang", "alpha", "dropout", "cibles"}
     assert config["alpha"] == 2 * config["rang"]

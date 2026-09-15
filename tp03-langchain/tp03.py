@@ -255,7 +255,7 @@ from commun.prompts import nettoyer_sortie
 
 sans_controle = atelier.mesurer(
     "tp03-chaine",
-    atelier.segments()[:30],
+    segments,
     lambda s: Sortie(texte=nettoyer_sortie(chaine.invoke(s["src"])), appels=1),
     titre="LangChain — chaîne seule",
 )
@@ -364,7 +364,7 @@ def traduire_et_corriger(segment: dict) -> Sortie:
 
 avec_controle = atelier.mesurer(
     "tp03-chaine-verifiee",
-    atelier.segments()[:30],
+    segments,
     traduire_et_corriger,
     titre=f"LangChain — chaîne + vérification (max {MAX_TENTATIVES} tentatives)",
 )
@@ -438,3 +438,18 @@ for segment in segments[:3]:
     print(f"  {chaine.invoke(segment['src'], config={'tags': ['obs2']})}")
 
 tracage.rapport()
+
+# %% [markdown]
+# ## ARB 1 · Votre arbitrage
+#
+# Votre boucle de correction gagne des points sur les chiffres et en perd sur
+# BLEU. **Écrivez en trois phrases** ce que vous livrez au client Helios :
+# la chaîne seule, la chaîne vérifiée, ou la chaîne avec réparation locale.
+#
+# Donnez le chiffre de votre propre table qui justifie le choix, et dites au nom
+# de quel indicateur vous tranchez. C'est la même question qu'au TP 1, mais
+# cette fois elle coûte des appels.
+#
+# > *Votre réponse :*
+# >
+# >

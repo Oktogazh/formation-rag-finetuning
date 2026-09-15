@@ -127,11 +127,11 @@ print(f"  entraînement {len(entrainement)} · validation {len(validation)} · "
       f"écartés pour fuite {len(ecartes)}")
 
 # %% [markdown]
-# ## CODE 1 · Fabriquer un exemple RAFT
+# ## OBS 2 · Fabriquer un exemple RAFT
 #
-# **C'est l'exercice le plus dense de la formation, et c'est normal : la
-# fabrication des données est 80 % du travail de fine-tuning**, et c'est là que
-# se trouvent 80 % des erreurs.
+# **Fourni, et c'est volontaire : c'est le code le plus dense de la formation,**
+# celui où se concentrent 80 % des erreurs de fine-tuning. Vous n'allez pas
+# l'écrire — vous allez le lire jusqu'à pouvoir répondre à trois questions.
 #
 # Un exemple RAFT est une conversation à trois messages : système, utilisateur
 # (le prompt augmenté), assistant (la bonne traduction). Ce qui change d'un
@@ -144,9 +144,22 @@ print(f"  entraînement {len(entrainement)} · validation {len(validation)} · "
 # Dans les deux cas, la réponse attendue reste la bonne traduction. C'est comme
 # cela que le modèle apprend à **trier** au lieu de recopier.
 #
-# Deux règles à ne pas casser : le segment ne doit jamais voir sa propre
-# traduction dans son contexte (c'est déjà garanti par `autres`), et le prompt
-# doit être **exactement** celui de l'inférence — `construire_messages`.
+# **Trois questions, en lisant le corps de la fonction :**
+#
+# 1. Qu'est-ce qui se passe dans ce code ? Repérez la ligne qui tire à pile ou
+#    face entre « vrais voisins » et « distracteurs », et celle qui construit
+#    le message `assistant`.
+# 2. **De quelle manière est-ce qu'on découpe le jeu d'entraînement** ? Ce n'est
+#    pas un découpage en deux fichiers : à chaque exemple, `rng.random() <
+#    p_oracle` décide, au tirage, s'il reçoit le bon contexte ou un leurre — le
+#    même segment peut tomber d'un côté ou de l'autre selon le tirage.
+# 3. Pourquoi le code exclut-il `segment` lui-même de `autres`, et pourquoi les
+#    distracteurs sont-ils tirés en dehors de `proches` plutôt que dans
+#    n'importe quel segment ?
+#
+# > *Vos réponses :*
+# >
+# >
 
 # %%
 def exemple_raft(segment: dict, memoire: list[dict], index_glossaire, k: int = 3,
@@ -156,15 +169,6 @@ def exemple_raft(segment: dict, memoire: list[dict], index_glossaire, k: int = 3
     autres = [s for s in memoire if s["id"] != segment["id"]]
     proches = rechercher_lexical(segment["src"], autres, k=10)
     termes = index_glossaire.chercher(segment["src"])
-    # <<<CODE 1 ★★★ Oracle ou distracteurs
-    #> 1. Si rng.random() < p_oracle : voisins = les k premiers de « proches ».
-    #>    Sinon : voisins = rng.sample(<les segments de « autres » dont l'id
-    #>    n'est PAS dans « proches »>, k).
-    #> 2. messages = construire_messages(segment["src"], voisins=voisins,
-    #>        glossaire=termes, consignes=CONSIGNE_STYLE)
-    #> 3. Rendez {"messages": messages + [{"role": "assistant",
-    #>                                     "content": segment["tgt"]}]}
-    #> Test : python tp.py test tp04 -k code1
     if rng.random() < p_oracle:
         voisins = proches[:k]
     else:
@@ -174,7 +178,6 @@ def exemple_raft(segment: dict, memoire: list[dict], index_glossaire, k: int = 3
     messages = construire_messages(segment["src"], voisins=voisins, glossaire=termes,
                                    consignes=CONSIGNE_STYLE)
     return {"messages": messages + [{"role": "assistant", "content": segment["tgt"]}]}
-    # >>>CODE 1
 
 
 apercu = exemple_raft(entrainement[0], memoire, index_glossaire, rng=random.Random(1))
@@ -226,7 +229,7 @@ for message in exemple["messages"]:
     print()
 
 # %% [markdown]
-# ## CODE 2 · Régler LoRA
+# ## CODE 1 · Régler LoRA
 #
 # Quatre nombres, et ils ont un sens :
 #
@@ -240,16 +243,16 @@ for message in exemple["messages"]:
 # %%
 def config_lora(rang: int = 8) -> dict:
     """Les réglages de LoRA."""
-    # <<<CODE 2 ★ Compléter la configuration
+    # <<<CODE 1 ★ Compléter la configuration
     #> Rendez un dictionnaire avec exactement ces quatre clés :
     #>   "rang"    -> l'argument rang
     #>   "alpha"   -> deux fois le rang
     #>   "dropout" -> 0.05
     #>   "cibles"  -> ["q_proj", "v_proj"]
-    #> Test : python tp.py test tp04 -k code2
+    #> Test : python tp.py test tp04 -k code1
     return {"rang": rang, "alpha": 2 * rang, "dropout": 0.05,
             "cibles": ["q_proj", "v_proj"]}
-    # >>>CODE 2
+    # >>>CODE 1
 
 
 print(config_lora())
@@ -298,7 +301,7 @@ del greffe, modele_sonde
 # 3. que se passerait-il si on oubliait `optimiseur.zero_grad()` ?
 
 # %% [markdown]
-# ## OBS 2 · Entraîner
+# ## OBS 3 · Entraîner
 #
 # Comptez cinq à quinze minutes selon votre machine. Regardez la perte
 # descendre : si elle stagne, le pas d'apprentissage est trop petit ; si elle
@@ -311,7 +314,7 @@ resultat = entrainer_lora(jeu, config_lora(RANG), epoques=1, taille_lot=4,
                           sortie=DOSSIER_ADAPTATEUR)
 
 # %% [markdown]
-# ## OBS 3 · Avant, après
+# ## OBS 4 · Avant, après
 #
 # Mêmes segments, même prompt, même température. La seule chose qui change est
 # l'adaptateur branché sur le modèle.

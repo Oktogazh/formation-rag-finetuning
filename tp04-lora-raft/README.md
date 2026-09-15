@@ -44,14 +44,14 @@ déjà fait le TP 2, il est déjà là.
 | Type | Exercice |
 |---|---|
 | OBS 1 | ce que le petit modèle sait faire avant l'entraînement |
-| **CODE 1** | fabriquer un exemple RAFT : oracle ou distracteurs |
+| OBS 2 | fabriquer un exemple RAFT : oracle ou distracteurs (lecture) |
 | RÉG 1 | le dosage des distracteurs |
 | LIRE 1 | ce que le modèle va réellement apprendre |
-| **CODE 2** | régler LoRA |
+| **CODE 1** | régler LoRA |
 | RÉG 2 | ce que le rang coûte |
 | LIRE 2 | la boucle d'entraînement, quarante lignes |
-| OBS 2 | entraîner |
-| OBS 3 | avant, après |
+| OBS 3 | entraîner |
+| OBS 4 | avant, après |
 | ARB 1 | qu'a appris le modèle ? |
 | BONUS 4 | un exemple sans contexte |
 
