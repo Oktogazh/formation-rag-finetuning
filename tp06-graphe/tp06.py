@@ -291,30 +291,39 @@ if sans_appel:
 # %% [markdown]
 # ## RÉG 1 · Le seuil de réutilisation
 #
-# **Changez `SEUIL`** — 0.85, 0.95, 0.99 — et relancez.
+# **Changez `SEUIL`** et relancez.
 #
 # Vous arbitrez entre deux coûts : trop bas, on réutilise des segments qui ne
 # conviennent pas et on livre des fautes ; trop haut, on paie le modèle pour des
 # segments que la mémoire traitait gratuitement.
 #
-# **Piège** : le routeur a *deux* conditions (`CODE 1`), reliées par un `and`.
-# Baisser `SEUIL` très bas — 0.001 par exemple — ne réutilise pas forcément plus
-# de segments : ceux dont le voisin diffère par autre chose qu'un chiffre
-# repartent en RAG quel que soit le seuil. Le compte ci-dessous sépare les deux
-# filtres pour que ce ne soit pas une surprise.
+# **Deux pièges, dans cet ordre :**
+#
+# 1. le routeur a *deux* conditions (`CODE 1`), reliées par un `and`. Baisser
+#    `SEUIL` très bas ne réutilise pas plus de segments que le nombre qui ne
+#    diffère de son voisin mémoire **que par des chiffres** — les autres
+#    repartent en RAG quel que soit le seuil.
+# 2. sur ce corpus, ces candidats ont tous un score **très regroupé** (voir la
+#    liste triée ci-dessous). Comparer 0.85 à 0.95 ne montrera **aucune**
+#    différence si les deux tombent sous le score du candidat le plus faible :
+#    il faut viser une valeur **à l'intérieur** de la fourchette affichée pour
+#    voir le routeur trancher différemment.
 #
 # Notez le seuil que vous retiendriez pour Helios, et le chiffre qui le justifie.
 
 # %%
-SEUIL = 0.85
-
-candidats_chiffres = sum(
-    1 for s in segments
+candidats_chiffres = sorted(
+    meilleur_voisin(s["src"], memoire)["score"] for s in segments
     if difference_chiffres_seulement(s["src"], meilleur_voisin(s["src"], memoire)["src"])
 )
-print(f"  {candidats_chiffres}/{len(segments)} segments ne diffèrent de leur "
-      f"voisin mémoire que par des chiffres — le seuil ne peut en réutiliser "
-      f"plus que ça, quelle que soit sa valeur.")
+print(f"  {len(candidats_chiffres)}/{len(segments)} segments ne diffèrent de leur "
+      f"voisin mémoire que par des chiffres — seuls eux peuvent basculer.")
+print(f"  Leurs scores, triés : {[round(t, 3) for t in candidats_chiffres]}")
+print(f"  → un seuil hors de [{candidats_chiffres[0]:.3f} ; {candidats_chiffres[-1]:.3f}] "
+      f"donne le même résultat que 0.95 ; il faut viser à l'intérieur pour voir "
+      f"le routeur en écarter.")
+
+SEUIL = 0.99
 
 SEUIL_REUTILISATION = SEUIL
 graphe = construire_graphe()
