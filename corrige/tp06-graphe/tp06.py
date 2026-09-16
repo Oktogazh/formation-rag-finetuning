@@ -297,10 +297,24 @@ if sans_appel:
 # conviennent pas et on livre des fautes ; trop haut, on paie le modèle pour des
 # segments que la mémoire traitait gratuitement.
 #
+# **Piège** : le routeur a *deux* conditions (`CODE 1`), reliées par un `and`.
+# Baisser `SEUIL` très bas — 0.001 par exemple — ne réutilise pas forcément plus
+# de segments : ceux dont le voisin diffère par autre chose qu'un chiffre
+# repartent en RAG quel que soit le seuil. Le compte ci-dessous sépare les deux
+# filtres pour que ce ne soit pas une surprise.
+#
 # Notez le seuil que vous retiendriez pour Helios, et le chiffre qui le justifie.
 
 # %%
 SEUIL = 0.85
+
+candidats_chiffres = sum(
+    1 for s in segments
+    if difference_chiffres_seulement(s["src"], meilleur_voisin(s["src"], memoire)["src"])
+)
+print(f"  {candidats_chiffres}/{len(segments)} segments ne diffèrent de leur "
+      f"voisin mémoire que par des chiffres — le seuil ne peut en réutiliser "
+      f"plus que ça, quelle que soit sa valeur.")
 
 SEUIL_REUTILISATION = SEUIL
 graphe = construire_graphe()

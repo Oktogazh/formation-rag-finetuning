@@ -648,6 +648,17 @@ def palier_sature(url: str, seuil_p95: float, segments: list[dict],
 
 
 # %% [markdown]
+# **Vérifiez sur le service réparé** : combien de clients simultanés peut-il
+# encaisser en gardant un p95 sous, disons, 30 secondes ? La dichotomie relance
+# `assaillir` à chaque essai, comptez ≈ 4 paliers de `duree` secondes.
+
+# %%
+seuil = 30.0
+n_max = palier_sature(serveur.url, seuil, SEGMENTS, duree=15.0)
+print(f"  Le service réparé (garde comprise) tient {n_max} client(s) simultané(s) "
+      f"en restant sous {seuil:.0f}s de p95")
+
+# %% [markdown]
 # ## LIRE 5 · Ce qui aurait vraiment réglé le problème
 #
 # **La garde protège ; elle n'accélère rien.** Elle transforme une dégradation
