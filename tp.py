@@ -11,8 +11,9 @@ Les six TP sont **indépendants**. Rater le TP 2 n'interdit pas le TP 3 : chaque
 notebook s'appuie sur ``commun/``, jamais sur ce qu'un autre TP vous a fait
 écrire.
 
-Cinq TP se font dans un notebook. Le TP 5 reste en fichiers, parce qu'on y
-déploie un service et qu'on le bombarde depuis un second terminal :
+Les six TP se font dans un notebook. Le TP 5 a en plus un service qui tourne
+pour de bon : son notebook peut le démarrer lui-même, ou vous le lancez dans un
+second terminal et vous le bombardez depuis un autre :
 
     python tp.py api                    lance le service de traduction en local
     python tp.py assaut --clients 1,4,8 bombarde un service et mesure
@@ -39,7 +40,7 @@ DOSSIERS = {
     "tp05": "tp05-mise-en-service",
     "tp06": "tp06-graphe",
 }
-NOTEBOOKS = ("tp01", "tp02", "tp03", "tp04", "tp06")
+NOTEBOOKS = ("tp01", "tp02", "tp03", "tp04", "tp05", "tp06")
 
 for _dossier in (RACINE, RACINE / "tp05-mise-en-service"):
     if str(_dossier) not in sys.path:
@@ -87,7 +88,7 @@ def cmd_check(args) -> int:
           ", ".join(etat["ollama_modeles"]) or "aucun modèle")
     ligne(f"Modèle {etat['modele_attendu']}", etat["modele_present"], "TP 1 à 6")
     ligne(f"Embeddings {etat['embeddings_attendu']}", etat["embeddings_present"], "TP 2, 3 et 6")
-    ligne("Jupyter", etat["jupyter"], "TP 1, 2, 3, 4 et 6")
+    ligne("Jupyter", etat["jupyter"], "TP 1 à 6")
     ligne("torch + transformers", etat["torch"] and etat["transformers"],
           "TP 1 chapitre 0, et TP 4")
     ligne("SmolLM2-135M (270 Mo)", etat["petit_modele_present"],
@@ -299,13 +300,13 @@ def cmd_rattraper(args) -> int:
 # TP 5 et table finale
 # ---------------------------------------------------------------------------
 def cmd_api(args) -> int:
-    from tp05.serveur_local import lancer
+    from service.serveur_local import lancer
 
     return lancer(port=args.port, repare=not args.sans_garde)
 
 
 def cmd_assaut(args) -> int:
-    from tp05.assaut import campagne
+    from service.assaut import campagne
 
     url = args.url or os.environ.get("TP_URL_SPACE", "")
     if not url:
@@ -388,7 +389,7 @@ def construire_analyseur() -> argparse.ArgumentParser:
     p.set_defaults(fonction=cmd_test)
 
     p = sous.add_parser("indice", help="le diff entre votre code et le corrigé")
-    p.add_argument("fichier", help="ex : tp02  ou  tp05/assaut.py")
+    p.add_argument("fichier", help="ex : tp02  ou  tp05")
     p.add_argument("--code", type=int, help="se limiter à ce CODE")
     p.set_defaults(fonction=cmd_indice)
 

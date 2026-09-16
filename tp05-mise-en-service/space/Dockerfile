@@ -6,18 +6,20 @@
 FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential cmake curl && rm -rf /var/lib/apt/lists/*
+        curl ca-certificates zstd && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://ollama.com/install.sh | sh
 
 RUN useradd -m -u 1000 utilisateur
 USER utilisateur
 ENV PATH=/home/utilisateur/.local/bin:$PATH \
     HOME=/home/utilisateur \
-    HF_HOME=/home/utilisateur/.cache/huggingface
+    OLLAMA_MODELS=/home/utilisateur/.ollama/models
 
 WORKDIR /home/utilisateur/app
 COPY --chown=utilisateur requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
-COPY --chown=utilisateur app.py .
+COPY --chown=utilisateur app.py demarrer.sh ./
+RUN chmod +x demarrer.sh
 
 EXPOSE 7860
-CMD ["python", "app.py"]
+CMD ["./demarrer.sh"]

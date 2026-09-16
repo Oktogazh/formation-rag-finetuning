@@ -437,7 +437,7 @@ atelier.comparer(("RAG lexical k=3", rag_lexical), ("RAG dense k=3", rag_dense))
 # > *Votre réponse :*
 # >
 # >
-
+#
 #
 # ---
 #

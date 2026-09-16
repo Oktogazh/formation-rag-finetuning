@@ -389,3 +389,78 @@ def exemple_sans_contexte(segment: dict, index_glossaire) -> dict:
         consignes=CONSIGNE_STYLE)
     return {"messages": messages + [{"role": "assistant", "content": segment["tgt"]}]}
     # >>>BONUS 4
+
+
+PART_SANS_CONTEXTE = 0.1
+
+tirage = random.Random(GRAINE)
+sans_contexte = [exemple_sans_contexte(s, index_glossaire)
+                 for s in tirage.sample(entrainement,
+                                        round(PART_SANS_CONTEXTE * len(entrainement)))]
+jeu_augmente = jeu + sans_contexte
+tirage.shuffle(jeu_augmente)
+
+print(f"  {len(jeu)} exemples RAFT + {len(sans_contexte)} sans contexte "
+      f"= {len(jeu_augmente)} exemples\n")
+atelier.montrer_prompt(sans_contexte[0]["messages"])
+
+# %% [markdown]
+# ### Réentraîner sur le jeu augmenté
+#
+# Vous avez maintenant deux jeux : `jeu` (RAFT seul) et `jeu_augmente` (le même,
+# plus 10 % d'exemples sans aucun voisin). **Rien n'oblige à s'arrêter là :
+# réentraînez sur le second et regardez si la qualité bouge.** C'est exactement
+# ce qu'on fait au bureau quand on change une recette de données — on ne discute
+# pas, on remesure.
+#
+# Passez `REENTRAINER` à `True` et comptez cinq à quinze minutes de plus. Le
+# nouvel adaptateur s'écrit **à côté** du premier, qui reste intact : les deux
+# restent comparables.
+#
+# **Deux mesures, et elles ne disent pas la même chose :**
+#
+# 1. **avec le prompt habituel** (trois voisins) : vous n'avez rien changé au cas
+#    nominal, donc n'espérez pas de gain. Ce que vous vérifiez ici, c'est que
+#    vous n'avez rien **perdu** — 10 % du jeu ne parlent plus de voisins.
+# 2. **avec un prompt sans aucun voisin** : c'est là que ça se joue. Le premier
+#    adaptateur n'a jamais vu ce prompt de sa vie ; le second l'a vu une
+#    trentaine de fois. Si l'écart est nul, votre conclusion est que le cas
+#    « recherche vide » ne valait pas 10 % du jeu — et c'est une conclusion, pas
+#    un échec.
+#
+# **Le piège à ne pas se tendre** : ne comparez jamais un chiffre mesuré avec
+# contexte à un chiffre mesuré sans. Ces deux tables se lisent **verticalement**,
+# chacune dans sa colonne.
+
+# %%
+REENTRAINER = False
+
+DOSSIER_AUGMENTE = DOSSIER_ADAPTATEUR.parent / "adaptateur-jeu-augmente"
+
+
+def prompt_sans_voisins(src: str):
+    return construire_messages(src, voisins=[], glossaire=index_glossaire.chercher(src),
+                               consignes=CONSIGNE_STYLE)
+
+
+if not REENTRAINER:
+    print("  REENTRAINER = False — passez-le à True pour entraîner sur le jeu augmenté")
+else:
+    entrainer_lora(jeu_augmente, config_lora(RANG), epoques=1, taille_lot=4,
+                   sortie=DOSSIER_AUGMENTE)
+    augmente = MoteurPetit(adaptateur=DOSSIER_AUGMENTE)
+    for cle, etiquette, construire in (("avec", "avec voisins", prompt_complet),
+                                       ("sans", "sans voisins", prompt_sans_voisins)):
+        mesures = [
+            (f"RAFT seul · {etiquette}",
+             atelier.mesurer(f"tp04-raft-{cle}-voisins", segments,
+                             atelier.traducteur(adapte, construire),
+                             titre=f"RAFT seul — {etiquette}")),
+            (f"jeu augmenté · {etiquette}",
+             atelier.mesurer(f"tp04-augmente-{cle}-voisins", segments,
+                             atelier.traducteur(augmente, construire),
+                             titre=f"Jeu augmenté — {etiquette}")),
+        ]
+        print()
+        atelier.comparer(*mesures)
+        atelier.par_categorie(*mesures)

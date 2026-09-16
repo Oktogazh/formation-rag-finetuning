@@ -1,4 +1,4 @@
-"""TP 5 — la piece qui manque au service : une garde.
+"""TP 5 — la piece qui manque au service : une garde. Version de reference, fournie.
 
 Le service du Space a un defaut, et c'est un defaut de conception, pas de
 modele : **il accepte tout ce qui arrive**. Chaque requete entre, occupe un fil
@@ -16,6 +16,10 @@ Un service qui sature doit faire trois choses, dans cet ordre :
 Refuser proprement n'est pas un aveu d'echec : c'est ce qui permet aux requetes
 acceptees de rester rapides. Un service qui n'a pas de garde n'a pas de latence,
 il a une loterie.
+
+**Ce fichier est fourni**, parce que ``serveur_local.py`` s'en sert et qu'un
+serveur doit tourner des la premiere minute du TP. Vous reecrivez cette garde
+vous-meme dans le notebook (CODE 2), et le notebook vous fait comparer.
 """
 
 from __future__ import annotations
@@ -51,7 +55,7 @@ class Garde:
         self.expirees = 0
 
     async def _lancer(self, fonction, *arguments):
-        """Execute la fonction bloquante hors de la boucle, avec un delai. Fourni.
+        """Execute la fonction bloquante hors de la boucle, avec un delai.
 
         ``fonction`` appelle le modele : si on la lancait directement, la boucle
         asyncio serait figee et le serveur ne pourrait meme plus repondre a
@@ -67,23 +71,13 @@ class Garde:
 
     async def executer(self, fonction, *arguments):
         """Execute ``fonction(*arguments)`` sous protection."""
-        # <<<CODE 2 ★★ La regle d'admission
-        #> 1. Si self.en_attente >= self.file_max : incrementez self.refusees et
-        #>    levez Sature(...) TOUT DE SUITE, sans attendre. Refuser en cinq
-        #>    millisecondes vaut mieux que repondre en deux minutes.
-        #> 2. Sinon, incrementez self.en_attente, puis « async with
-        #>    self.semaphore: » ; une fois le jeton obtenu, decrementez
-        #>    self.en_attente et rendez « await self._lancer(fonction, *arguments) ».
-        #> Test : python tp.py test tp05 -k code2
         if self.en_attente >= self.file_max:
             self.refusees += 1
-            raise Sature(f"{self.en_attente} requetes attendent deja "
-                         f"(file_max={self.file_max})")
+            raise Sature(f"file pleine ({self.file_max} en attente)")
         self.en_attente += 1
         async with self.semaphore:
             self.en_attente -= 1
             return await self._lancer(fonction, *arguments)
-        # >>>CODE 2
 
     def etat(self) -> dict:
         return {

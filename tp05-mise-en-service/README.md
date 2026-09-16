@@ -1,23 +1,43 @@
 # TP 5 — Un serveur, quatre assaillants
 
-**Objectif.** Un service de traduction tourne pour de bon, sur un Space
-HuggingFace, tracé dans LangSmith. Vous allez le bombarder, regarder la latence
-s'effondrer, diagnostiquer, puis réparer **une copie locale** et rejouer
-l'assaut dessus.
+**Objectif.** Un service de traduction tourne pour de bon — sur un Space
+HuggingFace, et à l'identique sur votre machine. Vous allez le bombarder,
+regarder la latence s'effondrer, diagnostiquer, écrire la pièce qui manque, et
+rejouer l'assaut sur un service protégé.
 
 **Durée.** Noyau ≈ 70 min · bonus ≈ 20 min · difficulté ★★☆☆☆
 
-## L'incident, avant de coder
+**Ce TP ne dépend d'aucun autre.** Le service est fourni ; rien de ce que vous
+avez écrit aux TP 1 à 4 n'est nécessaire ici.
 
-Le service du formateur répond correctement à **un** client, en une vingtaine de
-secondes. La question du TP est : que se passe-t-il à quatre ?
+## Où se fait le TP
 
-Ce que vous allez mesurer, et pourquoi ce ne sont pas des moyennes :
+**Dans le notebook `tp05.py` → `tp05.ipynb`**, comme les cinq autres :
+
+```bash
+python tp.py notebooks tp05
+jupyter lab
+```
+
+Tout y est : les notions, les mesures, les deux exercices de code et les
+comparaisons. Un serveur, ça boucle — il tourne donc **dans un autre
+processus**, que le notebook démarre lui-même (`demarrer_en_fond`). Si vous
+préférez le voir vivre, lancez-le dans un second terminal, c'est la même chose :
+
+```bash
+python tp.py api                  # avec la garde de référence
+python tp.py api --sans-garde     # le défaut du Space, reproduit chez vous
+
+python tp.py assaut --url http://localhost:8000 --clients 1,2,4,8 --duree 30
+```
+
+## Ce qu'on mesure, et pourquoi ce ne sont pas des moyennes
 
 | | |
 |---|---|
 | **p50** | la latence médiane. La moitié des requêtes sont plus rapides. |
 | **p95** | la latence que 95 % des requêtes ne dépassent pas. **C'est le chiffre qui figure dans un engagement de service**, parce que c'est celui que vos utilisateurs mécontents vivent. |
+| **p95 ok** | le même, sur les seules requêtes **servies**. Dès qu'un service refuse, c'est le seul qui veuille encore dire quelque chose. |
 | **débit** | requêtes terminées par seconde. S'il ne monte pas quand les clients se multiplient, le service n'en traite qu'une à la fois. |
 
 Une moyenne cache exactement ce qu'on cherche : quand un service sature, la
@@ -25,128 +45,73 @@ moyenne monte doucement pendant que le p95 explose.
 
 ## Prérequis
 
-L'URL du service, donnée par le formateur, dans `.env` :
+Aucun prérequis logiciel en plus des autres TP : `fastapi` et `uvicorn` sont
+déjà dans l'environnement conda, et le modèle est celui de toute la formation.
 
-```
-TP_URL_SPACE=https://<compte>-helios-traduction.hf.space
-```
+**Tout le TP se fait dans le notebook**, sans terminal. Deux exercices ouvrent
+un navigateur, et aucun ne demande de taper une commande :
 
-Et, pour regarder les traces, les identifiants LangSmith que le formateur donne
-dans le chat de la visio. Ils sont révoqués après la session.
+- **OBS 0** : la page du service, à l'adresse
+  `https://oktogazh-formation-rag-finetuning.hf.space` — déjà pré-remplie dans
+  la cellule `URL_SERVICE` (RÉG 0). Si le Space est éteint, videz la variable :
+  le notebook démarre le même service sur votre machine et **rien n'est perdu**,
+  sauf OBS 0 et OBS 2 ;
+- **OBS 2** : les traces LangSmith du Space, projet `formation-helios`.
 
-Aucun prérequis logiciel : `fastapi` et `uvicorn` sont déjà dans
-l'environnement conda.
+## Le déroulé du notebook
 
-## Déroulé
-
-**1. Prendre la référence** — TODO 1, dans `tp05/assaut.py`.
-
-```bash
-python tp.py test tp05 -k todo1
-python tp.py assaut --clients 1 --duree 30
-```
-
-Notez le p50. C'est la latence du service quand personne d'autre ne l'utilise,
-et c'est le seul chiffre que le développeur du service a jamais vu.
-
-**2. Monter en charge, tous ensemble.**
-
-```bash
-python tp.py assaut --clients 1,2,4,8 --duree 30
-```
-
-**Lancez-le en même temps que vos collègues** : c'est le même serveur pour toute
-la salle, et c'est le but. Regardez le p95 et le débit. Le débit ne monte pas.
-Les requêtes ne sont pas traitées en parallèle : elles font la queue, et
-personne n'obtient de réponse rapide.
-
-**3. Regarder les traces.**
-
-Ouvrez LangSmith, projet `formation-helios`. Chaque requête y est, avec sa durée
-et le nombre de clients déclaré dans l'en-tête `X-Clients` : vous retrouvez les
-vôtres. Vous voyez aussi que **le temps est passé dans le modèle**, pas dans le
-réseau. Le goulot n'est pas là où on l'imagine d'habitude.
-
-**4. Trouver le défaut.**
-
-Lisez `space/app.py`, en particulier le bloc `DÉFAUT VOLONTAIRE` en tête. Quatre
-choses manquent, et aucune n'est dans le modèle :
-
-- le point d'entrée est déclaré avec `def` et appelle le modèle de façon
-  bloquante ;
-- aucune limite de concurrence : tout ce qui arrive entre ;
-- aucune file d'attente bornée : personne n'est refusé, tout le monde attend ;
-- aucun délai maximum : une requête peut traîner indéfiniment.
-
-C'est le défaut le plus fréquent en production, et le moins visible en
-développement : sur la machine de celui qui l'a écrit, avec un seul client, tout
-allait bien.
-
-**5. Réparer** — TODO 2, dans `tp05/reparer.py`.
-
-Un service qui sature doit faire trois choses, dans cet ordre : **limiter** la
-concurrence, **refuser vite** ce qu'il ne pourra pas traiter, **abandonner** ce
-qui prend trop longtemps.
-
-Refuser proprement n'est pas un aveu d'échec : c'est ce qui permet aux requêtes
-acceptées de rester rapides. Un service sans garde n'a pas de latence, il a une
-loterie.
+| | Exercice | Ce qu'on y fait |
+|---|---|---|
+| RÉG 0 | la cible | le Space du formateur (adresse pré-remplie), ou votre machine |
+| OBS 0 | le service à la main | la page du Space, seul puis à toute la salle — *le seul exercice hors notebook* |
+| LIRE 1 | p50, p95, débit | pourquoi une moyenne ment sur un service saturé |
+| LIRE 2 | le défaut | quatre manques dans `space/app.py`, aucun dans le modèle |
+| **CODE 1** | `assaillir` | N clients en parallèle, latences mesurées |
+| OBS 1 | la montée en charge | p95 × N, débit plat : le service ne traite qu'une requête à la fois |
+| OBS 2 | LangSmith | retrouver ses requêtes par l'en-tête `X-Clients` |
+| LIRE 3 | limiter, refuser vite, abandonner | `503` et `504` ne disent pas la même chose |
+| **CODE 2** | `Garde.executer` | sémaphore, file bornée, délai maximum |
+| RÉG 1 | `file_max` | une file longue ne fait passer personne plus vite |
+| LIRE 4 | `space/app.py` réparé | l'extrait est **montré**, pas redéployé |
+| OBS 3 | l'assaut rejoué | des `503` apparaissent, et c'est le résultat attendu |
+| BONUS 5 | `palier_sature` | le nombre d'appels simultanés qu'on peut annoncer |
+| LIRE 5 | ce qui règle vraiment | GPU, *batching* continu, répliques |
+| LIRE 6 | le Space | déploiement, secrets, le piège de l'endpoint européen |
+| ARB 1 | votre arbitrage | ce que vous promettez, et ce que vous refusez de promettre |
 
 ```bash
-python tp.py test tp05 -k todo2
+python tp.py test tp05 -k code1
+python tp.py test tp05 -k code2
+python tp.py test tp05 --bonus -k bonus5
 ```
 
-**6. Rejouer l'assaut sur votre service réparé.**
+## Ce qui est fourni, et pourquoi
 
-Dans un premier terminal :
+Le paquet `service/` n'est **jamais édité par le stagiaire** :
 
-```bash
-python tp.py api
-```
+- `service/assaut.py` — l'assaut de référence, celui de `python tp.py assaut`,
+  et les fonctions d'affichage que le notebook réutilise ;
+- `service/reparer.py` — une garde de référence, dont le serveur local se sert
+  pour tourner **dès la première minute du TP**. Vous réécrivez la vôtre dans
+  le notebook, et vous comparez ;
+- `service/serveur_local.py` — le serveur, avec et sans garde, lançable depuis
+  un terminal ou depuis une cellule.
 
-Dans un second :
-
-```bash
-python tp.py assaut --url http://localhost:8000 --clients 8 --duree 30
-```
-
-Le p95 est borné, et des `503` apparaissent. **C'est le résultat attendu.** Pour
-comparer, relancez avec `python tp.py api --sans-garde` : c'est le défaut du
-Space, reproduit sur votre machine.
-
-**7. Ce qui aurait vraiment réglé le problème.**
-
-La garde protège ; elle n'accélère rien. Pour servir davantage il faut, par
-ordre de coût : un GPU (le modèle passe de 20 s à 1 s), du *batching* continu
-(vLLM traite plusieurs requêtes dans un même passage), plusieurs répliques
-derrière un répartiteur. Le Space gratuit n'offre aucune des trois, et c'est
-aussi une leçon : **la première décision d'une mise en service est le choix du
-matériel**, et elle se prend avec des mesures comme celles que vous venez de
-faire.
-
-## Les TODO
-
-| # | Fichier | Difficulté | Ce qu'on attend | Test |
-|---|---|---|---|---|
-| 1 | `tp05/assaut.py::assaillir` | ★★ | N clients en parallèle, latences mesurées | `-k todo1` |
-| 2 | `tp05/reparer.py::Garde.executer` | ★★ | sémaphore, file bornée, délai maximum | `-k todo2` |
-
-## Bonus
-
-**BONUS 5** — `palier_sature` : trouver par dichotomie le nombre de clients à
-partir duquel le p95 dépasse un seuil. C'est la mesure qu'on fournit à un client
-qui demande « combien d'utilisateurs ce service supporte-t-il ». La réponse n'est
-jamais un nombre d'utilisateurs : c'est un nombre d'appels simultanés, pour un
-engagement de latence donné.
+`space/` est le service déployé, **tel quel**. Il est volontairement mal
+configuré : voir le bloc « DÉFAUT VOLONTAIRE » en tête de `space/app.py`.
+**N'essayez pas de le réparer** — il appartient au formateur, il doit rester
+cassé pour la session suivante, et le code réparé est montré dans le notebook
+(LIRE 4) plutôt que redéployé.
 
 ## Si ça coince
 
-- *Le Space ne répond pas* → il se met en pause après 48 h d'inactivité ;
-  prévenez le formateur. Le TP se fait entièrement en local :
-  `python tp.py api --sans-garde` reproduit le même défaut.
-- *`assaut` rend surtout des codes 0* → ce sont des délais dépassés côté client.
+- *Le Space ne répond pas* → un Space gratuit s'endort après 48 h sans trafic ;
+  prévenez le formateur. Le TP se fait entièrement en local : laissez
+  `URL_SERVICE` vide.
+- *Le service local ne démarre pas* → `serveur.journal()` affiche ses dernières
+  lignes ; le journal complet est dans `resultats/tp05-serveur-8000.log`.
+- *L'assaut rend surtout des codes 0* → ce sont des délais dépassés côté client.
   C'est un résultat, pas une panne : notez-le.
-- *Rien dans LangSmith* → les identifiants sont donnés en séance, et le projet
-  s'appelle `formation-helios`.
-- **N'essayez pas de réparer le Space.** Il est mal configuré exprès, et il
-  appartient au formateur. Vous réparez votre copie locale.
+- *Rien dans LangSmith* → le projet est `formation-helios`, et les traces du
+  Space n'arrivent que si le formateur a posé les variables décrites dans
+  `space/README.md`.

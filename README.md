@@ -46,11 +46,12 @@ suffit : **tous les TP basculent sur l'API sans que vous changiez une ligne.**
 
 ## Les six TP
 
-Cinq se font dans un **notebook**. Le TP 5 reste en fichiers, parce qu'on y
-déploie un service et qu'on le bombarde depuis un second terminal.
+Les six se font dans un **notebook**. Le TP 5 a en plus un service qui tourne
+pour de bon : son notebook le démarre dans un autre processus, ou vous le lancez
+dans un second terminal et vous le bombardez depuis le notebook.
 
 ```bash
-python tp.py notebooks      # fabrique les cinq notebooks
+python tp.py notebooks      # fabrique les six notebooks
 jupyter lab                 # et ouvrez celui du jour
 ```
 
